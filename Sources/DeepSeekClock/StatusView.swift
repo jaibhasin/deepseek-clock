@@ -27,7 +27,7 @@ struct StatusView: View {
     @ObservedObject var clock: ClockModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 13) {
             header
             Divider()
             hero
@@ -38,8 +38,12 @@ struct StatusView: View {
             Divider()
             footer
         }
-        .padding(14)
-        .frame(width: 260)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(width: 292)
+        .background {
+            PopoverVisualEffect()
+        }
     }
 
     // MARK: - Header
@@ -173,4 +177,18 @@ struct StatusView: View {
         }
         NSWorkspace.shared.open(url)
     }
+}
+
+/// Keeps the panel translucent against the desktop while using AppKit's native
+/// popover material, so it follows the user's appearance and wallpaper colors.
+private struct PopoverVisualEffect: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

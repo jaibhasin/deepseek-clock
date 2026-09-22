@@ -34,7 +34,7 @@ struct StatusView: View {
             Divider()
             pricing
             Divider()
-            quitButton
+            footer
         }
         .padding(14)
         .frame(width: 260)
@@ -133,13 +133,30 @@ struct StatusView: View {
 
     // MARK: - Footer
 
-    /// A menu bar app has no window to close, so it needs an explicit way to quit.
-    /// Cmd-Q also works while the panel is focused.
-    private var quitButton: some View {
-        Button("Quit DeepSeek Clock") {
-            NSApp.terminate(nil)
+    /// A compact row of standard macOS buttons: jump to DeepSeek's pricing page or
+    /// quit. Bordered buttons and a small control size are the native look for a
+    /// popover this size. Cmd-Q also works while the panel is focused.
+    private var footer: some View {
+        HStack(spacing: 8) {
+            Button("Open DeepSeek API") { openPricingDocs() }
+                .frame(maxWidth: .infinity)
+
+            Button("Quit") { NSApp.terminate(nil) }
+                .keyboardShortcut("q")
+                .frame(maxWidth: .infinity)
         }
-        .keyboardShortcut("q")
+        .buttonStyle(.bordered)
         .controlSize(.small)
+    }
+
+    /// Opens DeepSeek's public API pricing documentation in the default browser.
+    ///
+    /// `NSWorkspace` is the standard AppKit way to hand a URL to the user's chosen
+    /// browser, and it costs us nothing until the button is actually clicked.
+    private func openPricingDocs() {
+        guard let url = URL(string: "https://api-docs.deepseek.com/quick_start/pricing") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 }

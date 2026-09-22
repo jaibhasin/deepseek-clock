@@ -30,6 +30,11 @@ A segmented toggle switches between `deepseek-flash` and `deepseek-v4-pro`;
 the chosen model is remembered across launches. Rates shown already reflect the
 current phase (peak or half-price off-peak).
 
+## Actions
+
+A compact footer offers two standard macOS buttons: **Open DeepSeek API** (opens
+the official pricing page in the default browser) and **Quit**.
+
 ## Future Features
 
 - Notify when off-peak begins

@@ -67,7 +67,7 @@ struct StatusView: View {
                 .foregroundStyle(.secondary)
 
             Text(clock.countdown)
-                .font(.system(size: 36, weight: .semibold, design: .rounded))
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(clock.phase.color)
 

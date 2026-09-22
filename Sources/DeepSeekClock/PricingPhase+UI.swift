@@ -21,12 +21,17 @@ import AppKit
 
 extension PricingPhase {
 
+    /// A hand-picked emerald green for off-peak. The system `.green` reads a bit
+    /// harsh/neon; this shade is deeper and calmer, and still clearly signals
+    /// "cheap, good time to run jobs".
+    static let offPeakGreen = Color(red: 0.13, green: 0.72, blue: 0.40)
+
     /// The brand colour for this phase. Used by both the menu bar icon and the
     /// dropdown, so the two can never disagree.
     var color: Color {
         switch self {
         case .peak:    return .red
-        case .offPeak: return .green
+        case .offPeak: return Self.offPeakGreen
         }
     }
 

@@ -84,7 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePanel)
-        statusItem.button?.image = StatusIcon.image(for: clock.phase)
+        statusItem.button?.image = StatusIcon.image(
+            for: clock.phase,
+            appearance: statusItem.button?.effectiveAppearance
+        )
         statusItem.button?.imagePosition = .imageOnly
 
         // Re-draw the whale when the system flips between light and dark mode.
@@ -189,7 +192,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let appearance = NSApp.effectiveAppearance.name
         if clock.phase != lastPaintedPhase || appearance != lastPaintedAppearance {
-            button.image = StatusIcon.image(for: clock.phase)
+            button.image = StatusIcon.image(
+                for: clock.phase,
+                appearance: button.effectiveAppearance
+            )
             lastPaintedPhase = clock.phase
             lastPaintedAppearance = appearance
         }

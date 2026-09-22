@@ -37,9 +37,14 @@ enum StatusIcon {
     /// both light and dark mode; the spout carries the phase colour.
     ///
     /// - Parameter size: edge length in points. Menu bar glyphs are ~18pt tall.
-    static func image(for phase: PricingPhase, size: CGFloat = 18) -> NSImage {
-        // Match the menu bar: black glyph on a light bar, white on a dark one.
-        let isDark = NSApp.effectiveAppearance
+    /// - Parameter appearance: appearance of the surface where the icon is shown.
+    static func image(for phase: PricingPhase,
+                      size: CGFloat = 18,
+                      appearance: NSAppearance? = nil) -> NSImage {
+        // The app appearance and menu bar appearance can differ, especially when
+        // menu bar translucency is enabled. Resolve against the actual surface.
+        let resolvedAppearance = appearance ?? NSApp.effectiveAppearance
+        let isDark = resolvedAppearance
             .bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let bodyColor: NSColor = isDark ? .white : .black
 

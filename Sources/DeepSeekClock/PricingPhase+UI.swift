@@ -7,7 +7,7 @@
 //  │ rule engine (`DeepSeekSchedule.swift`).                                      │
 //  │                                                                              │
 //  │ This is an `extension`, so the enum itself stays tiny while the UI layer      │
-//  │ decides how a phase should look. If we ever redesign the icon or wording,    │
+//  │ decides how a phase should look. If we ever redesign the wording or colours,  │
 //  │ the business logic never has to change.                                       │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
@@ -17,7 +17,6 @@
 //      peak     = RED    (full price, consider waiting)
 //
 import SwiftUI
-import AppKit
 
 extension PricingPhase {
 
@@ -26,19 +25,13 @@ extension PricingPhase {
     /// "cheap, good time to run jobs".
     static let offPeakGreen = Color(red: 0.13, green: 0.72, blue: 0.40)
 
-    /// The brand colour for this phase. Used by both the menu bar icon and the
-    /// dropdown, so the two can never disagree.
+    /// The brand colour for this phase. Used throughout the dropdown (the
+    /// countdown and subtitle) to signal cheap vs. full price at a glance.
     var color: Color {
         switch self {
         case .peak:    return .red
         case .offPeak: return Self.offPeakGreen
         }
-    }
-
-    /// The same colour as an AppKit value, needed to tint the `NSImage` that is
-    /// drawn into the menu bar (AppKit works in `NSColor`, SwiftUI in `Color`).
-    var nsColor: NSColor {
-        NSColor(color)
     }
 
     /// Big heading shown at the top of the dropdown.

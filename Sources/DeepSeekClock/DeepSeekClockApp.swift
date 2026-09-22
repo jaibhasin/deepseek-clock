@@ -187,5 +187,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // `.minY` is the button's lower edge in AppKit's coordinate system.
         // Anchoring there keeps the panel below the menu bar and the whale visible.
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+
+        // Status-item popovers can be aligned one menu-bar row too high on macOS.
+        // Move the window down by that exact row after AppKit creates it.
+        if let popoverWindow = popover.contentViewController?.view.window {
+            var frame = popoverWindow.frame
+            frame.origin.y -= NSStatusBar.system.thickness
+            popoverWindow.setFrame(frame, display: false)
+        }
     }
 }

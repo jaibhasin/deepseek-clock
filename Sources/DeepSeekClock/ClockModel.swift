@@ -11,10 +11,15 @@
 //  │     • selectedModel  → which model's rate card the user wants to see         │
 //  │     • notifyOnOffPeak → should we alert when cheap pricing begins?           │
 //  │                                                                              │
-//  │ `phase` and `countdown` are recomputed once a second by a `Timer`, so the     │
-//  │ menu bar label ticks down live without any manual refresh. The selected model │
-//  │ and the notification preference are remembered across launches via           │
-//  │ `UserDefaults`.                                                              │
+//  │ `phase` and `countdown` are recomputed by a *self-rescheduling* timer that    │
+//  │ only wakes the CPU when the on-screen information could actually change:      │
+//  │     • once a minute while the panel is closed (the countdown only changes by  │
+//  │       the minute in that state), and                                         │
+//  │     • once a second only while the panel is open and under an hour remains.  │
+//  │ It also refreshes immediately at the next phase transition, and on system     │
+//  │ events such as wake-from-sleep or a time-zone change (see `AppDelegate`).      │
+//  │ The selected model and the notification preference are remembered across      │
+//  │ launches via `UserDefaults`.                                                  │
 //  │                                                                              │
 //  │ SIDE EFFECTS ARE INJECTED                                                     │
 //  │ Sending a notification is a side effect the model must not hard-code, so it  │
@@ -89,8 +94,16 @@ final class ClockModel: ObservableObject {
     /// notification exactly once per peak → off-peak crossing, and never on launch.
     private var previousPhase: PricingPhase?
 
-    /// Strong reference to the repeating timer so it isn't deallocated.
+    /// Strong reference to the single pending timer so it isn't deallocated.
+    /// We use a *one-shot* timer that re-arms itself in `scheduleNextRefresh()`,
+    /// instead of a fixed repeating timer, so the wake-up interval can adapt to
+    /// what is actually visible.
     private var timer: Timer?
+
+    /// `true` while the dropdown panel is open. The panel shows a live countdown,
+    /// so we tick every second in that state; when it is closed there is nothing
+    /// on screen that changes faster than once a minute.
+    private var isPanelOpen = false
 
     /// Called after every refresh. The AppKit shell uses this hook to repaint
     /// the menu bar icon and tooltip. Keeping it a closure means `ClockModel`
@@ -112,31 +125,26 @@ final class ClockModel: ObservableObject {
         // when the key has never been set, which is the default we want.
         notifyOnOffPeak = UserDefaults.standard.bool(forKey: Self.notifyOnOffPeakKey)
 
-        // Show correct values immediately, then keep them fresh every second.
+        // Show correct values immediately; `refresh()` also arms the timer.
         refresh()
-        startTicking()
+    }
+
+    deinit {
+        timer?.invalidate()
     }
 
     // MARK: - Timing
 
-    /// Starts a 1-second repeating timer on the main run loop.
-    ///
-    /// `[weak self]` avoids a retain cycle (timer → closure → self → timer).
-    /// `.common` run-loop mode keeps it firing while menus/popovers are open.
-    private func startTicking() {
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            self?.refresh()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-    }
-
-    /// Recomputes `phase` and `countdown` from the current time.
+    /// Recomputes `phase` and `countdown` from the current time, then arms the
+    /// next wake-up.
     ///
     /// Also watches for the one crossing worth announcing: peak → off-peak. The
     /// notification fires only when both the previous tick was peak and this tick
     /// is off-peak, which makes it impossible to spam (and means launching the app
     /// while already off-peak stays silent).
+    ///
+    /// Call this directly after a system event (wake, clock/time-zone change) so
+    /// stale state is corrected at once instead of waiting for the next tick.
     func refresh() {
         let now = Date()
         let newPhase: PricingPhase = schedule.isPeak(at: now) ? .peak : .offPeak
@@ -154,6 +162,75 @@ final class ClockModel: ObservableObject {
         countdown = Self.format(remaining)
 
         onUpdate?()
+        scheduleNextRefresh()
+    }
+
+    /// Tells the model whether the dropdown panel is currently on screen.
+    ///
+    /// Opening it forces an immediate refresh (so the panel is never stale) and
+    /// switches to second-by-second ticking; closing it drops back to the cheaper
+    /// once-a-minute cadence.
+    func setPanelOpen(_ open: Bool) {
+        guard open != isPanelOpen else { return }
+        isPanelOpen = open
+        refresh()
+    }
+
+    /// Stops the timer entirely — used just before the Mac sleeps, when it could
+    /// not fire anyway. The wake observer calls `refresh()`, which re-arms it.
+    func pauseTicking() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    /// Arms a single timer for the next moment the displayed information can
+    /// change, replacing any timer already pending.
+    ///
+    /// The cadence is deliberately conservative:
+    ///   • panel open & < 1h left → 1s (a live countdown the user is reading);
+    ///   • otherwise              → the next minute boundary (the countdown is
+    ///                              only shown to the minute in this state).
+    /// The delay is capped by the time to the phase transition so the icon colour
+    /// and the off-peak notification never arrive late.
+    private func scheduleNextRefresh() {
+        timer?.invalidate()
+
+        let now = Date()
+        let remaining = transitionDate?.timeIntervalSince(now) ?? 0
+        let delay = Self.refreshDelay(remaining: remaining, panelOpen: isPanelOpen, now: now)
+
+        // `[weak self]` avoids a retain cycle (timer → closure → self → timer).
+        // `.common` keeps the tick alive while menus/popovers are tracking events.
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            self?.refresh()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    /// The pure timing rule behind `scheduleNextRefresh()`.
+    ///
+    /// Extracted as a static function so the cadence can be asserted in unit tests
+    /// without waiting on a real clock or run loop.
+    static func refreshDelay(remaining: TimeInterval, panelOpen: Bool, now: Date) -> TimeInterval {
+        // The countdown string changes every second only while it is under an hour
+        // (above that it shows whole minutes); and only the open panel shows it.
+        let wantsSecondTick = panelOpen && remaining < 3600
+
+        let proposed = wantsSecondTick ? 1 : secondsUntilNextMinute(from: now)
+
+        // Never sleep past the transition, and always wait a sane minimum so we can
+        // never busy-loop if the clock jumps backwards.
+        return max(0.5, min(proposed, max(remaining, 0.5)))
+    }
+
+    /// Seconds from `date` until the next whole minute, plus a small margin so the
+    /// timer lands just *after* the boundary rather than a hair before it.
+    static func secondsUntilNextMinute(from date: Date) -> TimeInterval {
+        // `.autoupdatingCurrent` follows the Mac's time zone, and the "second"
+        // component is the same in every zone anyway (offsets are whole minutes).
+        let second = Calendar.autoupdatingCurrent.component(.second, from: date)
+        return TimeInterval(60 - second) + 0.05
     }
 
     /// The pure rule behind the notification: alert only when the phase just flipped

@@ -30,7 +30,13 @@ struct StatusView: View {
         }
         .padding(16)
         .frame(width: 292)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            ZStack {
+                PopoverVisualEffect()
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.28 : 0.38)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -158,4 +164,18 @@ struct StatusView: View {
         guard let url = URL(string: "https://platform.deepseek.com") else { return }
         NSWorkspace.shared.open(url)
     }
+}
+
+/// Uses the same adaptive translucency as native macOS popovers. A light neutral
+/// wash above it keeps text contrast stable over bright or saturated wallpapers.
+private struct PopoverVisualEffect: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

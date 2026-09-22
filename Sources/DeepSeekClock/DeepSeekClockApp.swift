@@ -9,8 +9,8 @@
 //  │ WHY APPKIT INSTEAD OF SWIFTUI'S `MenuBarExtra`?                              │
 //  │ A hand-rolled `NSStatusItem` gives us direct control over the button's       │
 //  │ image and a live, per-second tooltip, which is all this little shell needs.  │
-//  │ The whale glyph (see `StatusIcon.swift`) is redrawn whenever the phase or    │
-//  │ the light/dark appearance changes.                                           │
+//  │ The whale glyph uses native template rendering so it stays visible against  │
+//  │ any menu bar wallpaper.                                                      │
 //  │                                                                              │
 //  │ The dropdown itself is still 100% SwiftUI (`StatusView`) hosted inside an    │
 //  │ `NSPanel` - AppKit handles positioning and keyboard focus.              │
@@ -37,13 +37,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Last phase we drew, so we only rebuild the icon when the colour changes
     /// (redrawing the image every tick is wasteful).
     private var lastPaintedPhase: PricingPhase?
-
-    /// The appearance (light/dark) the icon was last drawn for. The whale body
-    /// follows the menu bar, so a theme switch also needs a redraw.
-    private var lastPaintedAppearance: NSAppearance.Name?
-
-    /// Watches for light/dark switches so the whale body can be redrawn to match.
-    private var appearanceObservation: NSKeyValueObservation?
 
     /// Last tooltip we set, so an unchanged string is not reassigned on every tick.
     private var lastPaintedTooltip: String?
@@ -73,7 +66,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         removeEventMonitors()
-        appearanceObservation?.invalidate()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
     }
@@ -84,16 +76,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePanel)
-        statusItem.button?.image = StatusIcon.image(
-            for: clock.phase,
-            appearance: statusItem.button?.effectiveAppearance
-        )
+        statusItem.button?.image = StatusIcon.menuBarImage(for: clock.phase)
         statusItem.button?.imagePosition = .imageOnly
-
-        // Re-draw the whale when the system flips between light and dark mode.
-        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            self?.paint()
-        }
     }
 
     private func setUpPanel() {
@@ -184,20 +168,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Pushes the current phase/countdown into the status item.
     ///
-    /// The icon carries the phase colour in its spout, so it is rebuilt only when
-    /// the phase or the light/dark appearance actually changes. The tooltip is
-    /// likewise only rewritten when its text changes.
+    /// The icon is rebuilt only when the phase changes. The tooltip is likewise
+    /// only rewritten when its text changes.
     private func paint() {
         guard let button = statusItem.button else { return }
 
-        let appearance = NSApp.effectiveAppearance.name
-        if clock.phase != lastPaintedPhase || appearance != lastPaintedAppearance {
-            button.image = StatusIcon.image(
-                for: clock.phase,
-                appearance: button.effectiveAppearance
-            )
+        if clock.phase != lastPaintedPhase {
+            button.image = StatusIcon.menuBarImage(for: clock.phase)
             lastPaintedPhase = clock.phase
-            lastPaintedAppearance = appearance
         }
 
         // Only touch the tooltip/accessibility text when it actually changed. Each

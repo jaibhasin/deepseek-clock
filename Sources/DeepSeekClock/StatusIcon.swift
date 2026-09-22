@@ -3,9 +3,7 @@
 //  DeepSeek Clock
 //
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
-//  │ Builds the little menu bar glyph: a whale whose body matches the system's      │
-//  │ menu bar foreground (black on a light bar, white on a dark one) while the      │
-//  │ water spout on its head is tinted GREEN (off-peak) or RED (peak).              │
+//  │ Builds the whale shown in the menu bar and panel header.                       │
 //  │                                                                              │
 //  │ WHY DRAW IT IN CODE?                                                          │
 //  │ The shape is just a handful of Bézier curves, so drawing it ourselves means   │
@@ -14,12 +12,8 @@
 //  │ rectangle it is handed, so it scales cleanly from the 18pt menu bar glyph to  │
 //  │ the 26pt popover header.                                                      │
 //  │                                                                              │
-//  │ WHY NOT A TEMPLATE IMAGE?                                                     │
-//  │ Template images are flattened by macOS to a single colour, which would erase  │
-//  │ the red/green spout. So we draw the whale ourselves, choosing black or white  │
-//  │ to match the current appearance, and paint the spout in the phase colour.     │
-//  │ The image therefore has to be rebuilt when the theme or the phase changes     │
-//  │ (see `DeepSeekClockApp.paint()`).                                             │
+//  │ The menu bar uses a template version so macOS can maintain contrast against   │
+//  │ any wallpaper. The panel version keeps the red/green phase-coloured spout.     │
 //  │                                                                              │
 //  │ HOW THE WHALE IS ASSEMBLED                                                   │
 //  │ The body, tail fluke and pectoral fin overlap and share one colour, so they   │
@@ -31,20 +25,14 @@ import AppKit
 
 enum StatusIcon {
 
-    /// Returns a menu-bar-ready whale glyph for `phase` at `size` points.
+    /// Returns a coloured whale glyph for the panel header.
     ///
     /// The body is drawn in the system menu bar foreground so it looks native in
     /// both light and dark mode; the spout carries the phase colour.
     ///
     /// - Parameter size: edge length in points. Menu bar glyphs are ~18pt tall.
-    /// - Parameter appearance: appearance of the surface where the icon is shown.
-    static func image(for phase: PricingPhase,
-                      size: CGFloat = 18,
-                      appearance: NSAppearance? = nil) -> NSImage {
-        // The app appearance and menu bar appearance can differ, especially when
-        // menu bar translucency is enabled. Resolve against the actual surface.
-        let resolvedAppearance = appearance ?? NSApp.effectiveAppearance
-        let isDark = resolvedAppearance
+    static func image(for phase: PricingPhase, size: CGFloat = 18) -> NSImage {
+        let isDark = NSApp.effectiveAppearance
             .bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let bodyColor: NSColor = isDark ? .white : .black
 
@@ -65,6 +53,15 @@ enum StatusIcon {
 
         // No template flattening: we need to keep the coloured spout.
         image.isTemplate = false
+        return image
+    }
+
+    /// A native template variant for the menu bar. macOS chooses its foreground
+    /// from the wallpaper behind the menu bar, which can differ from light/dark
+    /// mode. Template rendering is the only reliable way to follow that contrast.
+    static func menuBarImage(for phase: PricingPhase, size: CGFloat = 18) -> NSImage {
+        let image = image(for: phase, size: size)
+        image.isTemplate = true
         return image
     }
 

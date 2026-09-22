@@ -7,10 +7,10 @@
 //  │ and the popover that appears when you click it.                              │
 //  │                                                                              │
 //  │ WHY APPKIT INSTEAD OF SWIFTUI'S `MenuBarExtra`?                              │
-//  │ `MenuBarExtra` draws its label as a *template* image — the system flattens   │
-//  │ it to plain monochrome, which would throw away our green/red signal.        │
-//  │ A hand-rolled `NSStatusItem` lets us set a non-template, pre-tinted image    │
-//  │ (see `StatusIcon.swift`), so the colour reliably survives.                   │
+//  │ A hand-rolled `NSStatusItem` gives us direct control over the button's       │
+//  │ image and a live, per-second tooltip, which is all this little shell needs.  │
+//  │ The whale glyph itself is a template image (see `StatusIcon.swift`), so the  │
+//  │ system paints it black/white to match the menu bar appearance.               │
 //  │                                                                              │
 //  │ The dropdown itself is still 100% SwiftUI (`StatusView`) hosted inside an    │
 //  │ `NSPopover` — we only drop to AppKit for the status item shell.              │
@@ -30,10 +30,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// The panel shown on click, hosting the SwiftUI `StatusView`.
     private let popover = NSPopover()
-
-    /// Last phase we drew, so we only rebuild the icon when the colour changes
-    /// (redrawing the image every tick is wasteful).
-    private var lastPaintedPhase: PricingPhase?
 
     /// Last tooltip we set, so an unchanged string is not reassigned on every tick.
     private var lastPaintedTooltip: String?
@@ -72,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePopover)
+        statusItem.button?.image = StatusIcon.template()
         statusItem.button?.imagePosition = .imageOnly
     }
 
@@ -129,15 +126,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     // MARK: - Rendering
 
-    /// Pushes the current phase/countdown into the status item. Both the icon and
-    /// the tooltip are only rewritten when their value actually changed.
+    /// Pushes the current countdown into the status item's tooltip. The icon is a
+    /// fixed template, so only the tooltip changes as time passes.
     private func paint() {
         guard let button = statusItem.button else { return }
-
-        if clock.phase != lastPaintedPhase {
-            button.image = StatusIcon.image(for: clock.phase)
-            lastPaintedPhase = clock.phase
-        }
 
         // Only touch the tooltip/accessibility text when it actually changed. Each
         // assignment is cheap, but skipping identical ones keeps idle work at zero.

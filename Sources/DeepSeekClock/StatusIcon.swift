@@ -3,110 +3,135 @@
 //  DeepSeek Clock
 //
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
-//  │ Builds the little menu bar icon: a simple whale silhouette tinted GREEN       │
-//  │ (off-peak) or RED (peak).                                                     │
+//  │ Builds the little menu bar glyph: a simple spouting whale, drawn as a         │
+//  │ TEMPLATE image so macOS paints it black on a light menu bar and white on a    │
+//  │ dark one — exactly like the built-in system icons.                            │
 //  │                                                                              │
 //  │ WHY DRAW IT IN CODE?                                                          │
 //  │ The shape is just a handful of Bézier curves, so drawing it ourselves means   │
 //  │ no image asset to bundle, no file to go missing, and a crisp result at any    │
 //  │ size. The path is authored in a 0…1 "unit box" and stretched into whatever    │
-//  │ rectangle it is handed, so it scales cleanly from 18pt menu bar glyph to the  │
-//  │ 26pt popover header.                                                          │
+//  │ rectangle it is handed, so it scales cleanly from the 18pt menu bar glyph to  │
+//  │ the 26pt popover header.                                                      │
 //  │                                                                              │
-//  │ WHY TINT MANUALLY?                                                            │
-//  │ macOS renders "template" images as flat monochrome — that is why most menu    │
-//  │ bar glyphs follow the light/dark system colour. To keep the green/red         │
-//  │ meaning we must turn templating OFF and colour the pixels ourselves.          │
+//  │ WHAT "TEMPLATE" MEANS                                                        │
+//  │ Setting `isTemplate = true` throws away the image's colours and keeps only    │
+//  │ its ALPHA channel. macOS then draws that shape in whatever foreground colour  │
+//  │ the control needs (black in light mode, white in dark mode). That is why      │
+//  │ everything below is drawn in plain black — the colour is irrelevant; only the │
+//  │ silhouette matters.                                                           │
 //  │                                                                              │
-//  │ HOW THE SILHOUETTE IS ASSEMBLED                                              │
-//  │   1. draw the rounded body                                                    │
-//  │   2. add the two-lobed tail fluke on top                                      │
-//  │   3. add the little pectoral fin underneath                                   │
-//  │ All three shapes overlap and are filled with the same colour, so they fuse    │
-//  │ into one solid whale silhouette.                                              │
+//  │ HOW THE WHALE IS ASSEMBLED                                                   │
+//  │ The body, tail fluke, pectoral fin and water spout are separate overlapping   │
+//  │ shapes. They are filled with the same colour, so they fuse into one solid     │
+//  │ silhouette (overlaps are invisible because there is nothing behind them).     │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 import AppKit
 
 enum StatusIcon {
 
-    /// Returns a coloured, menu-bar-ready image for `phase`.
+    /// Returns a menu-bar-ready whale glyph at `size` points.
+    ///
+    /// The image is a template, so the menu bar automatically renders it
+    /// black/white to match the system appearance.
     ///
     /// - Parameter size: edge length in points. Menu bar glyphs are ~18pt tall.
-    static func image(for phase: PricingPhase, size: CGFloat = 18) -> NSImage {
+    static func template(size: CGFloat = 18) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            phase.nsColor.setFill()
-            // A little breathing room so the whale does not touch the glyph edges.
-            let box = rect.insetBy(dx: rect.width * 0.05, dy: rect.height * 0.12)
-            bodyPath(in: box).fill()
-            tailPath(in: box).fill()
-            finPath(in: box).fill()
+            NSColor.black.setFill()
+            // A small margin so the whale does not touch the glyph edges.
+            let box = rect.insetBy(dx: rect.width * 0.04, dy: rect.height * 0.04)
+
+            body(in: box).fill()
+            tail(in: box).fill()
+            fin(in: box).fill()
+            spout(in: box).fill()
+
             return true
         }
 
-        // `isTemplate = false` is the crucial line: it tells macOS "do NOT
-        // recolour this for me" so our green/red survives into the menu bar.
-        image.isTemplate = false
+        // Keep only the alpha; let the system pick the foreground colour.
+        image.isTemplate = true
         return image
     }
 
-    // MARK: - The whale, built from three overlapping shapes
+    // MARK: - The whale, built from overlapping shapes
 
-    /// The rounded head-and-body blob. The small dip near the right is the back,
-    /// which the tail attaches to.
-    private static func bodyPath(in rect: NSRect) -> NSBezierPath {
+    /// The rounded head-and-body blob. The dip on the right is the back, which the
+    /// tail attaches to.
+    private static func body(in rect: NSRect) -> NSBezierPath {
         let path = NSBezierPath()
-        let p: (CGFloat, CGFloat) -> NSPoint = point(in: rect)
+        let p = point(in: rect)
 
-        path.move(to: p(0.06, 0.50))                         // nose (left tip)
-        path.curve(to: p(0.46, 0.78),                        // over the top of the head
-                   controlPoint1: p(0.10, 0.80),
-                   controlPoint2: p(0.28, 0.82))
-        path.curve(to: p(0.70, 0.60),                        // slight hump, then back
-                   controlPoint1: p(0.60, 0.76),
-                   controlPoint2: p(0.70, 0.68))
-        path.curve(to: p(0.64, 0.34),                        // down the rear of the body
-                   controlPoint1: p(0.70, 0.50),
-                   controlPoint2: p(0.68, 0.40))
-        path.curve(to: p(0.06, 0.50),                        // along the belly to the nose
-                   controlPoint1: p(0.34, 0.20),
-                   controlPoint2: p(0.10, 0.26))
+        path.move(to: p(0.06, 0.44))                         // nose (left tip)
+        path.curve(to: p(0.44, 0.66),                        // over the top of the head
+                   controlPoint1: p(0.10, 0.68),
+                   controlPoint2: p(0.26, 0.70))
+        path.curve(to: p(0.68, 0.50),                        // back, sloping to the tail
+                   controlPoint1: p(0.58, 0.64),
+                   controlPoint2: p(0.68, 0.58))
+        path.curve(to: p(0.62, 0.28),                        // down the rear of the body
+                   controlPoint1: p(0.68, 0.40),
+                   controlPoint2: p(0.66, 0.34))
+        path.curve(to: p(0.06, 0.44),                        // along the belly to the nose
+                   controlPoint1: p(0.32, 0.16),
+                   controlPoint2: p(0.10, 0.22))
         path.close()
         return path
     }
 
-    /// The tail: two solid triangular lobes meeting at a notch, exactly the way a
-    /// whale fluke is drawn in its simplest pictogram form.
-    private static func tailPath(in rect: NSRect) -> NSBezierPath {
+    /// The tail: two solid triangular lobes meeting at a notch, the simplest way a
+    /// whale fluke is drawn in a pictogram.
+    private static func tail(in rect: NSRect) -> NSBezierPath {
         let path = NSBezierPath()
         let p = point(in: rect)
 
-        path.move(to: p(0.60, 0.58))                         // attach to the upper back
-        path.curve(to: p(0.97, 0.72),                        // sweep out to the top tip
-                   controlPoint1: p(0.78, 0.64),
-                   controlPoint2: p(0.90, 0.72))
-        path.line(to: p(0.82, 0.50))                         // in to the central notch
-        path.line(to: p(0.97, 0.28))                         // back out to the bottom tip
-        path.curve(to: p(0.60, 0.42),                        // sweep in to the lower back
-                   controlPoint1: p(0.90, 0.28),
-                   controlPoint2: p(0.78, 0.36))
+        path.move(to: p(0.58, 0.50))                         // attach to the upper back
+        path.curve(to: p(0.93, 0.64),                        // sweep out to the top tip
+                   controlPoint1: p(0.76, 0.56),
+                   controlPoint2: p(0.87, 0.64))
+        path.line(to: p(0.79, 0.45))                         // in to the central notch
+        path.line(to: p(0.94, 0.26))                         // back out to the bottom tip
+        path.curve(to: p(0.58, 0.38),                        // sweep in to the lower back
+                   controlPoint1: p(0.87, 0.26),
+                   controlPoint2: p(0.76, 0.32))
         path.close()
         return path
     }
 
     /// The small pectoral fin hanging under the body.
-    private static func finPath(in rect: NSRect) -> NSBezierPath {
+    private static func fin(in rect: NSRect) -> NSBezierPath {
         let path = NSBezierPath()
         let p = point(in: rect)
 
-        path.move(to: p(0.50, 0.38))
-        path.curve(to: p(0.44, 0.12),                        // down to the fin tip
-                   controlPoint1: p(0.52, 0.30),
-                   controlPoint2: p(0.48, 0.14))
-        path.curve(to: p(0.31, 0.28),                        // back up into the body
-                   controlPoint1: p(0.35, 0.12),
-                   controlPoint2: p(0.33, 0.20))
+        path.move(to: p(0.46, 0.32))
+        path.curve(to: p(0.40, 0.10),                        // down to the fin tip
+                   controlPoint1: p(0.48, 0.26),
+                   controlPoint2: p(0.44, 0.12))
+        path.curve(to: p(0.28, 0.24),                        // back up into the body
+                   controlPoint1: p(0.32, 0.10),
+                   controlPoint2: p(0.30, 0.17))
         path.close()
+        return path
+    }
+
+    /// The water spout: a tall central plume with a droplet either side. Ellipses
+    /// are enough at this size and stay readable when shrunk to 18pt.
+    private static func spout(in rect: NSRect) -> NSBezierPath {
+        let path = NSBezierPath()
+        let p = point(in: rect)
+
+        // A filled ellipse from a normalised centre + size.
+        func drop(_ cx: CGFloat, _ cy: CGFloat, _ w: CGFloat, _ h: CGFloat) {
+            let origin = p(cx - w / 2, cy)
+            let size = NSSize(width: w * rect.width, height: h * rect.height)
+            path.appendOval(in: NSRect(origin: origin, size: size))
+        }
+
+        drop(0.20, 0.62, 0.11, 0.30)                         // central plume
+        drop(0.11, 0.72, 0.055, 0.12)                        // left droplet
+        drop(0.29, 0.72, 0.055, 0.12)                        // right droplet
         return path
     }
 

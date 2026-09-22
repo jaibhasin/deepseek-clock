@@ -190,7 +190,7 @@ final class ClockModel: ObservableObject {
     ///   • panel open & < 1h left → 1s (a live countdown the user is reading);
     ///   • otherwise              → the next minute boundary (the countdown is
     ///                              only shown to the minute in this state).
-    /// The delay is capped by the time to the phase transition so the icon colour
+    /// The delay is capped by the time to the phase transition so the countdown
     /// and the off-peak notification never arrive late.
     private func scheduleNextRefresh() {
         timer?.invalidate()

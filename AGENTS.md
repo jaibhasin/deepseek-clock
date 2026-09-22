@@ -50,6 +50,7 @@ If CI fails, inspect the failure, fix the underlying issue, commit the fix, and 
 
 ## Git Workflow
 Commit frequently.
+Local commits are encouraged even for small meaningful changes.
 Make git messages clear and descriptive without adding unnecessary verbosity and co-authorship.
 Prefer many small, focused commits over large commits containing unrelated changes.
 Create commits even for small but meaningful changes.

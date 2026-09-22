@@ -64,9 +64,11 @@ system clock or time-zone change — so the menu bar is always correct after a n
 
 ## App icon and identity
 
-The app ships as a proper macOS bundle with a generated `AppIcon.icns` (a blue
-rounded tile with the white DeepSeek whale). It is a menu-bar-only agent
-(`LSUIElement`), so it never shows a Dock icon or an app-switcher entry.
+The app ships as a proper macOS bundle with a generated `AppIcon.icns` — a funky
+neon squircle (pink → violet → cyan) carrying the same white whale and yellow
+spout as the menu bar glyph. The icon is drawn in code by
+`Scripts/make-appicon.swift`, so it needs no bitmap source. It is a menu-bar-only
+agent (`LSUIElement`), so it never shows a Dock icon or an app-switcher entry.
 
 ## Future Features
 

@@ -29,12 +29,10 @@ mkdir -p "${BUNDLE}/Contents/MacOS"
 mkdir -p "${BUNDLE}/Contents/Resources"
 
 # 3. Drop the compiled binary, the metadata plist, and the artwork into place.
-#    The logo must be in Contents/Resources so `NSImage(named: "DeepSeekLogo")`
-#    can find it at runtime; AppIcon.icns is what the Finder/Dock show and is
-#    referenced by CFBundleIconFile in Info.plist.
+#    AppIcon.icns is what the Finder/Dock show and is referenced by
+#    CFBundleIconFile in Info.plist.
 cp ".build/release/${APP_NAME}" "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "Resources/Info.plist" "${BUNDLE}/Contents/Info.plist"
-cp "Resources/DeepSeekLogo.png" "${BUNDLE}/Contents/Resources/DeepSeekLogo.png"
 cp "Resources/AppIcon.icns" "${BUNDLE}/Contents/Resources/AppIcon.icns"
 
 # 4. Ad-hoc signature ("-") is enough for a locally-built app on the same Mac.

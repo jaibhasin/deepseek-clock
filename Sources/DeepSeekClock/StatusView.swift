@@ -34,6 +34,8 @@ struct StatusView: View {
             Divider()
             pricing
             Divider()
+            notificationToggle
+            Divider()
             footer
         }
         .padding(14)
@@ -129,6 +131,18 @@ struct StatusView: View {
                 .fontWeight(.medium)
         }
         .font(.caption)
+    }
+
+    // MARK: - Notifications setting
+
+    /// A single standard macOS switch, bound straight to the persisted preference.
+    /// `.small` + caption type keep it compact so the panel stays lightweight.
+    /// Turning it on triggers the one-time system permission prompt via the model.
+    private var notificationToggle: some View {
+        Toggle("Notify me when off-peak starts", isOn: $clock.notifyOnOffPeak)
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .font(.caption)
     }
 
     // MARK: - Footer

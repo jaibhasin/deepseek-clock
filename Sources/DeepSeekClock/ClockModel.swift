@@ -6,13 +6,19 @@
 //  │ The "view model" that glues the pure rules in `DeepSeekSchedule` to the UI.  │
 //  │                                                                              │
 //  │ It owns the published state that the menu bar renders:                       │
-//  │     • phase         → is it peak or off-peak right now?                      │
-//  │     • countdown     → "2h 14m" until the price changes                       │
-//  │     • selectedModel → which model's rate card the user wants to see          │
+//  │     • phase          → is it peak or off-peak right now?                     │
+//  │     • countdown      → "2h 14m" until the price changes                      │
+//  │     • selectedModel  → which model's rate card the user wants to see         │
+//  │     • notifyOnOffPeak → should we alert when cheap pricing begins?           │
 //  │                                                                              │
 //  │ `phase` and `countdown` are recomputed once a second by a `Timer`, so the     │
 //  │ menu bar label ticks down live without any manual refresh. The selected model │
-//  │ is remembered across launches via `UserDefaults`.                            │
+//  │ and the notification preference are remembered across launches via           │
+//  │ `UserDefaults`.                                                              │
+//  │                                                                              │
+//  │ SIDE EFFECTS ARE INJECTED                                                     │
+//  │ Sending a notification is a side effect the model must not hard-code, so it  │
+//  │ is handed a `NotificationService` at init. Tests can pass a spy instead.     │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 //  WHAT IS `ObservableObject`?
@@ -52,17 +58,36 @@ final class ClockModel: ObservableObject {
         didSet { UserDefaults.standard.set(selectedModel.rawValue, forKey: Self.selectedModelKey) }
     }
 
+    /// Whether the user wants a system notification when peak turns into off-peak.
+    /// The view binds a toggle to this. Persisted on change; switching it on also
+    /// asks macOS for notification permission so the alert can actually appear.
+    @Published var notifyOnOffPeak: Bool = false {
+        didSet {
+            UserDefaults.standard.set(notifyOnOffPeak, forKey: Self.notifyOnOffPeakKey)
+            if notifyOnOffPeak { notifications.requestAuthorization() }
+        }
+    }
+
     /// Current rates for the selected model, already resolved to the live phase.
     /// The view reads this; it is derived, never stored.
     var currentPricing: ModelPricing {
         DeepSeekPricing.pricing(for: selectedModel, phase: phase)
     }
 
-    /// `UserDefaults` key for remembering the selected model between launches.
+    /// `UserDefaults` keys for the two remembered preferences.
     private static let selectedModelKey = "selectedModel"
+    private static let notifyOnOffPeakKey = "notifyOnOffPeak"
 
     /// The rule engine. Stateless, so one instance is enough for the whole app.
     private let schedule = DeepSeekSchedule()
+
+    /// Delivers the off-peak alert. Injected so tests can swap in a spy.
+    private let notifications: NotificationService
+
+    /// The phase we saw on the previous tick, or `nil` before the first tick.
+    /// Comparing it against the freshly computed phase is what lets us fire the
+    /// notification exactly once per peak → off-peak crossing, and never on launch.
+    private var previousPhase: PricingPhase?
 
     /// Strong reference to the repeating timer so it isn't deallocated.
     private var timer: Timer?
@@ -72,7 +97,9 @@ final class ClockModel: ObservableObject {
     /// still imports nothing but Foundation and stays easy to test.
     var onUpdate: (() -> Void)?
 
-    init() {
+    init(notifications: NotificationService = UserNotificationService()) {
+        self.notifications = notifications
+
         // Restore the model the user last picked, if any. Assigning here does not
         // trigger the `didSet` observer (property observers are skipped during
         // initialization), so we do not immediately write the value back.
@@ -80,6 +107,10 @@ final class ClockModel: ObservableObject {
            let saved = DeepSeekModel(rawValue: raw) {
             selectedModel = saved
         }
+
+        // Restore the notification preference. `bool(forKey:)` returns `false`
+        // when the key has never been set, which is the default we want.
+        notifyOnOffPeak = UserDefaults.standard.bool(forKey: Self.notifyOnOffPeakKey)
 
         // Show correct values immediately, then keep them fresh every second.
         refresh()
@@ -101,9 +132,21 @@ final class ClockModel: ObservableObject {
     }
 
     /// Recomputes `phase` and `countdown` from the current time.
+    ///
+    /// Also watches for the one crossing worth announcing: peak → off-peak. The
+    /// notification fires only when both the previous tick was peak and this tick
+    /// is off-peak, which makes it impossible to spam (and means launching the app
+    /// while already off-peak stays silent).
     func refresh() {
         let now = Date()
-        phase = schedule.isPeak(at: now) ? .peak : .offPeak
+        let newPhase: PricingPhase = schedule.isPeak(at: now) ? .peak : .offPeak
+
+        if Self.shouldNotifyOffPeak(from: previousPhase, to: newPhase, enabled: notifyOnOffPeak) {
+            notifications.notifyOffPeakStarted()
+        }
+
+        phase = newPhase
+        previousPhase = newPhase
 
         let next = schedule.nextTransition(after: now)
         transitionDate = next
@@ -111,6 +154,19 @@ final class ClockModel: ObservableObject {
         countdown = Self.format(remaining)
 
         onUpdate?()
+    }
+
+    /// The pure rule behind the notification: alert only when the phase just flipped
+    /// from peak to off-peak *and* the user asked for it.
+    ///
+    /// Extracted as a static function so the decision can be unit-tested without a
+    /// timer, a real clock or a real notification center.
+    static func shouldNotifyOffPeak(
+        from previous: PricingPhase?,
+        to current: PricingPhase,
+        enabled: Bool
+    ) -> Bool {
+        enabled && previous == .peak && current == .offPeak
     }
 
     // MARK: - Formatting

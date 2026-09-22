@@ -35,9 +35,20 @@ current phase (peak or half-price off-peak).
 A compact footer offers two standard macOS buttons: **DeepSeek Console** (opens
 the DeepSeek platform console in the default browser) and **Quit**.
 
+## Notifications
+
+An optional switch — "Notify me when off-peak starts" — sends a one-time system
+notification when pricing flips from peak to off-peak:
+
+- title: "DeepSeek is now off-peak"
+- body: "API pricing is currently 50% lower."
+
+The alert fires only on that exact crossing, so it never repeats. The preference
+is stored locally in `UserDefaults`, and enabling it prompts for macOS
+notification permission once.
+
 ## Future Features
 
-- Notify when off-peak begins
 - Notify before peak pricing begins
 - Launch at login
 

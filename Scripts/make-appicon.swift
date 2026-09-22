@@ -19,8 +19,8 @@
 //  │ crisp because we render fresh at each resolution.                             │
 //  │                                                                              │
 //  │ THE LOOK: a funky neon squircle (pink → violet → cyan) with the white whale   │
-//  │ and its sunshine-yellow spout, so the icon feels playful while still reading  │
-//  │ as "the DeepSeek clock whale".                                                │
+//  │ breathing out a little arc of rising bubbles, so the icon feels playful while │
+//  │ still reading as "the DeepSeek clock whale".                                  │
 //  │                                                                              │
 //  │ HOW TO RUN (from the repository root, on macOS):                             │
 //  │                                                                              │
@@ -28,7 +28,7 @@
 //  │                                                                              │
 //  │ WHAT IT DOES                                                                 │
 //  │   1. draws a rounded-rectangle ("squircle") tile with a funky gradient        │
-//  │   2. draws the whale silhouette + yellow spout centred on the tile            │
+//  │   2. draws the whale silhouette + rising bubbles centred on the tile          │
 //  │   3. renders the tile at every required size into `AppIcon.iconset/`          │
 //  │   4. hands that folder to Apple's `iconutil` to produce `AppIcon.icns`        │
 //  │   5. also writes a 2048 px `AppIcon-2048.png` master for docs/marketing,      │
@@ -57,12 +57,9 @@ let gradientPink = NSColor(srgbRed: 1.00, green: 0.13, blue: 0.55, alpha: 1)
 let gradientViolet = NSColor(srgbRed: 0.55, green: 0.15, blue: 0.98, alpha: 1)
 let gradientCyan = NSColor(srgbRed: 0.00, green: 0.83, blue: 0.98, alpha: 1)
 
-/// The whale silhouette: clean white reads best against the saturated background.
+/// The whale silhouette and its bubbles: clean white reads best against the
+/// saturated background, and keeps the whole mark feeling like one object.
 let whaleWhite = NSColor.white
-
-/// The spout keeps its role as the "indicator" from the menu bar, but in a fun
-/// sunshine yellow instead of the red/green peak/off-peak states.
-let spoutYellow = NSColor(srgbRed: 1.00, green: 0.89, blue: 0.30, alpha: 1)
 
 /// macOS icons leave a transparent margin around the artwork; ~9% per side matches
 /// the visual weight of system icons.
@@ -147,19 +144,17 @@ func drawWhale(in rect: NSRect) {
     silhouette.fill()
     NSGraphicsContext.restoreGraphicsState()
 
-    // Body + tail + fin in white, the spout in yellow.
+    // Body + tail + fin in white, then the bubbles above the head.
     whaleWhite.setFill()
     bodyPath(in: rect).fill()
     tailPath(in: rect).fill()
     finPath(in: rect).fill()
-
-    spoutYellow.setFill()
-    spoutPath(in: rect).fill()
+    bubblePath(in: rect).fill()
 }
 
-// These four shapes mirror `StatusIcon.swift` so the app icon and the menu bar
-// glyph are unmistakably the same whale. Each is authored in a 0…1 "unit box" and
-// stretched into `rect`, so it scales cleanly from 16 px to 1024 px.
+// The body, tail and fin mirror `StatusIcon.swift` so the app icon and the menu
+// bar glyph are unmistakably the same whale. Each is authored in a 0…1 "unit box"
+// and stretched into `rect`, so it scales cleanly from 16 px to 1024 px.
 
 /// The rounded head-and-body blob. The dip on the right is the back, which the
 /// tail attaches to.
@@ -219,22 +214,25 @@ func finPath(in rect: NSRect) -> NSBezierPath {
     return path
 }
 
-/// The water spout: a tall central plume with a droplet either side. Ellipses
-/// are enough at this size and stay readable when shrunk to 16 px.
-func spoutPath(in rect: NSRect) -> NSBezierPath {
+/// The whale's breath: a short arc of bubbles rising from the blowhole. They
+/// shrink as they drift up and to the left, which reads as gentle motion and —
+/// unlike the old three-lobed plume — never looks like a crown. Plain circles
+/// stay crisp even at 16 px.
+func bubblePath(in rect: NSRect) -> NSBezierPath {
     let path = NSBezierPath()
     let p = point(in: rect)
 
-    // A filled ellipse from a normalised centre + size.
-    func drop(_ cx: CGFloat, _ cy: CGFloat, _ w: CGFloat, _ h: CGFloat) {
-        let origin = p(cx - w / 2, cy)
-        let size = NSSize(width: w * rect.width, height: h * rect.height)
+    // A filled circle from a normalised centre + diameter.
+    func bubble(_ cx: CGFloat, _ cy: CGFloat, _ d: CGFloat) {
+        let origin = p(cx - d / 2, cy - d / 2)
+        let size = NSSize(width: d * rect.width, height: d * rect.height)
         path.appendOval(in: NSRect(origin: origin, size: size))
     }
 
-    drop(0.20, 0.61, 0.13, 0.34)                         // central plume
-    drop(0.105, 0.71, 0.065, 0.14)                       // left droplet
-    drop(0.295, 0.71, 0.065, 0.14)                       // right droplet
+    bubble(0.240, 0.700, 0.115)                          // biggest, just leaving the blowhole
+    bubble(0.175, 0.795, 0.088)
+    bubble(0.105, 0.875, 0.060)
+    bubble(0.045, 0.935, 0.034)                          // smallest, drifting away
     return path
 }
 

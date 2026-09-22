@@ -65,8 +65,8 @@ system clock or time-zone change — so the menu bar is always correct after a n
 ## App icon and identity
 
 The app ships as a proper macOS bundle with a generated `AppIcon.icns` — a funky
-neon squircle (pink → violet → cyan) carrying the same white whale and yellow
-spout as the menu bar glyph. The icon is drawn in code by
+neon squircle (pink → violet → cyan) carrying the same white whale as the menu
+bar glyph, breathing a playful arc of rising bubbles. The icon is drawn in code by
 `Scripts/make-appicon.swift`, so it needs no bitmap source; the same script also
 emits a 2048 px `Resources/AppIcon-2048.png` master for docs. It is a menu-bar-only
 agent (`LSUIElement`), so it never shows a Dock icon or an app-switcher entry.

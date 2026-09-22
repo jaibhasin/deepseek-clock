@@ -44,10 +44,10 @@ struct StatusView: View {
 
     // MARK: - Header
 
-    /// The whale glyph, plus the phase name tinted green/red.
+    /// The whale glyph with its phase-coloured spout, plus the phase name.
     private var header: some View {
         HStack(spacing: 10) {
-            Image(nsImage: StatusIcon.template(size: 26))
+            Image(nsImage: StatusIcon.image(for: clock.phase, size: 26))
             VStack(alignment: .leading, spacing: 1) {
                 Text(clock.phase.title).font(.headline)
                 Text(clock.phase.subtitle)

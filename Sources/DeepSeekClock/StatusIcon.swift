@@ -3,9 +3,9 @@
 //  DeepSeek Clock
 //
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
-//  │ Builds the little menu bar glyph: a simple spouting whale, drawn as a         │
-//  │ TEMPLATE image so macOS paints it black on a light menu bar and white on a    │
-//  │ dark one — exactly like the built-in system icons.                            │
+//  │ Builds the little menu bar glyph: a whale whose body matches the system's      │
+//  │ menu bar foreground (black on a light bar, white on a dark one) while the      │
+//  │ water spout on its head is tinted GREEN (off-peak) or RED (peak).              │
 //  │                                                                              │
 //  │ WHY DRAW IT IN CODE?                                                          │
 //  │ The shape is just a handful of Bézier curves, so drawing it ourselves means   │
@@ -14,45 +14,52 @@
 //  │ rectangle it is handed, so it scales cleanly from the 18pt menu bar glyph to  │
 //  │ the 26pt popover header.                                                      │
 //  │                                                                              │
-//  │ WHAT "TEMPLATE" MEANS                                                        │
-//  │ Setting `isTemplate = true` throws away the image's colours and keeps only    │
-//  │ its ALPHA channel. macOS then draws that shape in whatever foreground colour  │
-//  │ the control needs (black in light mode, white in dark mode). That is why      │
-//  │ everything below is drawn in plain black — the colour is irrelevant; only the │
-//  │ silhouette matters.                                                           │
+//  │ WHY NOT A TEMPLATE IMAGE?                                                     │
+//  │ Template images are flattened by macOS to a single colour, which would erase  │
+//  │ the red/green spout. So we draw the whale ourselves, choosing black or white  │
+//  │ to match the current appearance, and paint the spout in the phase colour.     │
+//  │ The image therefore has to be rebuilt when the theme or the phase changes     │
+//  │ (see `DeepSeekClockApp.paint()`).                                             │
 //  │                                                                              │
 //  │ HOW THE WHALE IS ASSEMBLED                                                   │
-//  │ The body, tail fluke, pectoral fin and water spout are separate overlapping   │
-//  │ shapes. They are filled with the same colour, so they fuse into one solid     │
-//  │ silhouette (overlaps are invisible because there is nothing behind them).     │
+//  │ The body, tail fluke and pectoral fin overlap and share one colour, so they   │
+//  │ fuse into a solid silhouette. The water spout is drawn last in the state      │
+//  │ colour so it reads as a little indicator light on top of the head.            │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 import AppKit
 
 enum StatusIcon {
 
-    /// Returns a menu-bar-ready whale glyph at `size` points.
+    /// Returns a menu-bar-ready whale glyph for `phase` at `size` points.
     ///
-    /// The image is a template, so the menu bar automatically renders it
-    /// black/white to match the system appearance.
+    /// The body is drawn in the system menu bar foreground so it looks native in
+    /// both light and dark mode; the spout carries the phase colour.
     ///
     /// - Parameter size: edge length in points. Menu bar glyphs are ~18pt tall.
-    static func template(size: CGFloat = 18) -> NSImage {
+    static func image(for phase: PricingPhase, size: CGFloat = 18) -> NSImage {
+        // Match the menu bar: black glyph on a light bar, white on a dark one.
+        let isDark = NSApp.effectiveAppearance
+            .bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let bodyColor: NSColor = isDark ? .white : .black
+
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            NSColor.black.setFill()
             // A small margin so the whale does not touch the glyph edges.
             let box = rect.insetBy(dx: rect.width * 0.04, dy: rect.height * 0.04)
 
+            bodyColor.setFill()
             body(in: box).fill()
             tail(in: box).fill()
             fin(in: box).fill()
+
+            phase.nsColor.setFill()
             spout(in: box).fill()
 
             return true
         }
 
-        // Keep only the alpha; let the system pick the foreground colour.
-        image.isTemplate = true
+        // No template flattening: we need to keep the coloured spout.
+        image.isTemplate = false
         return image
     }
 

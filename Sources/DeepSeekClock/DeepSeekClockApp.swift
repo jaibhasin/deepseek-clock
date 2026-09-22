@@ -9,8 +9,8 @@
 //  │ WHY APPKIT INSTEAD OF SWIFTUI'S `MenuBarExtra`?                              │
 //  │ A hand-rolled `NSStatusItem` gives us direct control over the button's       │
 //  │ image and a live, per-second tooltip, which is all this little shell needs.  │
-//  │ The whale glyph itself is a template image (see `StatusIcon.swift`), so the  │
-//  │ system paints it black/white to match the menu bar appearance.               │
+//  │ The whale glyph (see `StatusIcon.swift`) is redrawn whenever the phase or    │
+//  │ the light/dark appearance changes.                                           │
 //  │                                                                              │
 //  │ The dropdown itself is still 100% SwiftUI (`StatusView`) hosted inside an    │
 //  │ `NSPopover` — we only drop to AppKit for the status item shell.              │
@@ -30,6 +30,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// The panel shown on click, hosting the SwiftUI `StatusView`.
     private let popover = NSPopover()
+
+    /// Last phase we drew, so we only rebuild the icon when the colour changes
+    /// (redrawing the image every tick is wasteful).
+    private var lastPaintedPhase: PricingPhase?
+
+    /// The appearance (light/dark) the icon was last drawn for. The whale body
+    /// follows the menu bar, so a theme switch also needs a redraw.
+    private var lastPaintedAppearance: NSAppearance.Name?
+
+    /// Watches for light/dark switches so the whale body can be redrawn to match.
+    private var appearanceObservation: NSKeyValueObservation?
 
     /// Last tooltip we set, so an unchanged string is not reassigned on every tick.
     private var lastPaintedTooltip: String?
@@ -58,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        appearanceObservation?.invalidate()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
     }
@@ -68,8 +80,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePopover)
-        statusItem.button?.image = StatusIcon.template()
+        statusItem.button?.image = StatusIcon.image(for: clock.phase)
         statusItem.button?.imagePosition = .imageOnly
+
+        // Re-draw the whale when the system flips between light and dark mode.
+        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            self?.paint()
+        }
     }
 
     private func setUpPopover() {
@@ -126,10 +143,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     // MARK: - Rendering
 
-    /// Pushes the current countdown into the status item's tooltip. The icon is a
-    /// fixed template, so only the tooltip changes as time passes.
+    /// Pushes the current phase/countdown into the status item.
+    ///
+    /// The icon carries the phase colour in its spout, so it is rebuilt only when
+    /// the phase or the light/dark appearance actually changes. The tooltip is
+    /// likewise only rewritten when its text changes.
     private func paint() {
         guard let button = statusItem.button else { return }
+
+        let appearance = NSApp.effectiveAppearance.name
+        if clock.phase != lastPaintedPhase || appearance != lastPaintedAppearance {
+            button.image = StatusIcon.image(for: clock.phase)
+            lastPaintedPhase = clock.phase
+            lastPaintedAppearance = appearance
+        }
 
         // Only touch the tooltip/accessibility text when it actually changed. Each
         // assignment is cheap, but skipping identical ones keeps idle work at zero.

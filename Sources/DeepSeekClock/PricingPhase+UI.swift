@@ -17,6 +17,7 @@
 //      peak     = RED    (full price, consider waiting)
 //
 import SwiftUI
+import AppKit
 
 extension PricingPhase {
 
@@ -32,6 +33,12 @@ extension PricingPhase {
         case .peak:    return .red
         case .offPeak: return Self.offPeakGreen
         }
+    }
+
+    /// The same colour as an AppKit value, needed to tint the state dot on the
+    /// menu bar whale (AppKit works in `NSColor`, SwiftUI in `Color`).
+    var nsColor: NSColor {
+        NSColor(color)
     }
 
     /// Big heading shown at the top of the dropdown.

@@ -1,8 +1,16 @@
-# DeepSeek Clock
+# DeepSeek Clock 🐋 - Catch the cheaper hours.
 
-See whether DeepSeek API pricing is peak or off-peak, right from your Mac's menu bar.
+> DeepSeek peak and off-peak pricing, in your menu bar.
 
-Click the icon to see how long until prices change, when that happens in your timezone, and the current rates for Flash and V4 Pro.
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-232a31)
+![Swift 5.9+](https://img.shields.io/badge/Swift-5.9%2B-f05138)
+[![License: MIT](https://img.shields.io/badge/license-MIT-8b5cf6)](LICENSE)
+
+See when DeepSeek is half price without checking the clock yourself.
+Click the menu bar icon for current Flash and V4 Pro rates, a countdown to the next price change, and the time it happens in your timezone.
+
+Native macOS app.
+No account or backend needed.
 
 ## Pricing schedule
 
@@ -20,8 +28,6 @@ You'll need macOS 13+ and Swift 5.9 or later.
 ./build.sh
 open DeepSeekClock.app
 ```
-
-The app lives in your menu bar, with no account or backend needed.
 
 ## Tests
 

@@ -20,7 +20,7 @@ import AppKit
 import SwiftUI
 
 @main
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// Single source of truth for pricing state, shared by the icon and popover.
     private let clock = ClockModel()
@@ -32,8 +32,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
 
     /// Last phase we drew, so we only rebuild the icon when the colour changes
-    /// (the timer ticks every second; redrawing the image every tick is wasteful).
+    /// (redrawing the image every tick is wasteful).
     private var lastPaintedPhase: PricingPhase?
+
+    /// Last tooltip we set, so an unchanged string is not reassigned on every tick.
+    private var lastPaintedTooltip: String?
 
     // MARK: - Entry point
 
@@ -51,10 +54,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
         setUpPopover()
+        observeSystemEvents()
 
-        // Repaint whenever the model refreshes (once a second).
+        // Repaint whenever the model refreshes.
         clock.onUpdate = { [weak self] in self?.paint() }
         paint()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Setup
@@ -69,13 +78,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpPopover() {
         // `.transient` closes the popover automatically when you click elsewhere.
         popover.behavior = .transient
+        popover.delegate = self
         popover.contentViewController = NSHostingController(rootView: StatusView(clock: clock))
+    }
+
+    /// Subscribes to the system events that can invalidate our cached state.
+    ///
+    /// A menu bar app can run for days, so it must not trust its timer to have
+    /// fired on schedule. Timers are suspended while the Mac sleeps, and the clock
+    /// or time zone can change underneath us, so we recompute from scratch on:
+    ///   • `didWake`  — the machine just woke; catch up and re-arm the timer;
+    ///   • `willSleep`— stop ticking while asleep (no point waking the CPU);
+    ///   • clock/time-zone changes — the displayed local time may have moved.
+    private func observeSystemEvents() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.addObserver(self, selector: #selector(systemStateChanged),
+                              name: NSWorkspace.didWakeNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(systemWillSleep),
+                              name: NSWorkspace.willSleepNotification, object: nil)
+
+        let defaultCenter = NotificationCenter.default
+        defaultCenter.addObserver(self, selector: #selector(systemStateChanged),
+                                  name: .NSSystemClockDidChange, object: nil)
+        defaultCenter.addObserver(self, selector: #selector(systemStateChanged),
+                                  name: .NSSystemTimeZoneDidChange, object: nil)
+    }
+
+    /// Recompute phase/countdown immediately after the system changed underneath us.
+    @objc private func systemStateChanged() {
+        clock.refresh()
+    }
+
+    /// Sleep suspends timers anyway; dropping ours makes that explicit and avoids a
+    /// burst of catch-up fires the instant the Mac wakes.
+    @objc private func systemWillSleep() {
+        clock.pauseTicking()
+    }
+
+    // MARK: - NSPopoverDelegate
+
+    /// The panel shows a live countdown, so switch the model to its fast cadence
+    /// while it is visible, and back to the cheap cadence when it closes.
+    func popoverDidShow(_ notification: Notification) {
+        clock.setPanelOpen(true)
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        clock.setPanelOpen(false)
     }
 
     // MARK: - Rendering
 
-    /// Pushes the current phase/countdown into the status item. The icon is only
-    /// rebuilt when the phase (colour) changes; the tooltip updates every tick.
+    /// Pushes the current phase/countdown into the status item. Both the icon and
+    /// the tooltip are only rewritten when their value actually changed.
     private func paint() {
         guard let button = statusItem.button else { return }
 
@@ -84,8 +139,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastPaintedPhase = clock.phase
         }
 
-        button.toolTip = "\(clock.phase.title) · \(clock.phase.changeLabel) \(clock.countdown)"
+        // Only touch the tooltip/accessibility text when it actually changed. Each
+        // assignment is cheap, but skipping identical ones keeps idle work at zero.
+        let tooltip = "\(clock.phase.title) · \(clock.phase.changeLabel) \(clock.countdown)"
+        guard tooltip != lastPaintedTooltip else { return }
+
+        button.toolTip = tooltip
         button.setAccessibilityLabel("DeepSeek pricing: \(clock.phase.title), \(clock.countdown) left")
+        lastPaintedTooltip = tooltip
     }
 
     // MARK: - Interaction

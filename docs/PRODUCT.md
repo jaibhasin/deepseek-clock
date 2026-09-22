@@ -47,6 +47,27 @@ The alert fires only on that exact crossing, so it never repeats. The preference
 is stored locally in `UserDefaults`, and enabling it prompts for macOS
 notification permission once.
 
+## Resource usage
+
+The app is designed to be idle-friendly. Rather than ticking every second forever,
+it wakes the CPU only when something it shows could actually change:
+
+- while the panel is closed it refreshes once a minute (the menu bar only changes
+  colour at a phase transition);
+- while the panel is open and under an hour remains it counts down every second;
+- it always wakes exactly at the next phase transition, so the icon colour and any
+  notification are never late.
+
+Sleep and clock changes are handled explicitly: the app stops its timer before the
+Mac sleeps and recomputes the phase and countdown immediately on wake — and on any
+system clock or time-zone change — so the menu bar is always correct after a nap.
+
+## App icon and identity
+
+The app ships as a proper macOS bundle with a generated `AppIcon.icns` (a blue
+rounded tile with the white DeepSeek whale). It is a menu-bar-only agent
+(`LSUIElement`), so it never shows a Dock icon or an app-switcher entry.
+
 ## Future Features
 
 - Notify before peak pricing begins

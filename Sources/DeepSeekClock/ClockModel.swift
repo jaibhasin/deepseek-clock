@@ -34,6 +34,17 @@ final class ClockModel: ObservableObject {
     /// Human-readable time until the next phase change, e.g. "2h 14m".
     @Published private(set) var countdown: String = "--"
 
+    /// The absolute instant of the next phase change. The view renders this in
+    /// the Mac's current time zone (see `formattedTransition`), so the user sees
+    /// "when it ends" on their own clock, not in UTC.
+    @Published private(set) var transitionDate: Date?
+
+    /// The next transition as a local wall-clock time, e.g. "4:00 AM", or `nil`
+    /// while we have not computed one yet.
+    var formattedTransition: String? {
+        transitionDate.map(Self.formatTransition)
+    }
+
     /// Which model's rate card the dropdown shows. The view binds its picker to
     /// this, so it must be publicly settable. It is persisted on every change so
     /// the user's choice survives quitting and relaunching the app.
@@ -94,7 +105,9 @@ final class ClockModel: ObservableObject {
         let now = Date()
         phase = schedule.isPeak(at: now) ? .peak : .offPeak
 
-        let remaining = schedule.nextTransition(after: now)?.timeIntervalSince(now) ?? 0
+        let next = schedule.nextTransition(after: now)
+        transitionDate = next
+        let remaining = next?.timeIntervalSince(now) ?? 0
         countdown = Self.format(remaining)
 
         onUpdate?()
@@ -116,5 +129,22 @@ final class ClockModel: ObservableObject {
         if hours > 0 { return "\(hours)h \(minutes)m" }
         if minutes > 0 { return "\(minutes)m \(seconds)s" }
         return "\(seconds)s"
+    }
+
+    /// Formats an absolute transition instant as a local time, e.g. "4:00 AM".
+    ///
+    /// `timeZone = .autoupdatingCurrent` is the key line: it follows whatever time
+    /// zone the Mac is set to *right now*, without us ever hardcoding one. Built
+    /// once and reused because `DateFormatter` is comparatively expensive.
+    private static let transitionFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    static func formatTransition(_ date: Date) -> String {
+        transitionFormatter.string(from: date)
     }
 }

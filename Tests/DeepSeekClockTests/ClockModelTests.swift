@@ -27,4 +27,11 @@ final class ClockModelTests: XCTestCase {
     func testCountdownClampsNegativeDurations() {
         XCTAssertEqual(ClockModel.format(-5), "0s")
     }
+
+    /// The absolute transition is rendered as a local wall-clock time (using the
+    /// Mac's current time zone), so the result is a non-empty, human-readable time.
+    func testTransitionFormattingProducesLocalTime() {
+        let text = ClockModel.formatTransition(TestSupport.utc(2026, 9, 21, 4, 0))
+        XCTAssertFalse(text.isEmpty)
+    }
 }

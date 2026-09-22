@@ -42,7 +42,7 @@ struct StatusView: View {
         HStack(spacing: 9) {
             Image(nsImage: StatusIcon.image(for: clock.phase, size: 24))
                 .accessibilityHidden(true)
-            Text("DeepSeek")
+            Text("DeepSeek Clock")
                 .font(.system(size: 14, weight: .semibold))
             Spacer()
             HStack(spacing: 5) {

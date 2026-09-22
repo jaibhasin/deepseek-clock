@@ -31,15 +31,23 @@
 	<key>CFBundleExecutable</key>
 	<string>DeepSeekClock</string>
 
+	<!-- The app icon. `build.sh` copies AppIcon.icns into Contents/Resources;
+	     the value here is the filename WITHOUT the .icns extension. -->
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+
 	<!-- APPL = a regular application bundle. -->
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>1.0.0</string>
 
 	<key>CFBundleVersion</key>
 	<string>1</string>
+
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 DeepSeek Clock contributors. MIT licensed.</string>
 
 	<!-- Refuse to launch on anything older than macOS 13 (Ventura). -->
 	<key>LSMinimumSystemVersion</key>

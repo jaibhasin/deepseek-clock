@@ -1,4 +1,4 @@
-# DeepSeek Clock 🐋 - Catch the cheaper hours.
+# DeepSeek Clock 🐋
 
 > DeepSeek peak and off-peak pricing, in your menu bar.
 

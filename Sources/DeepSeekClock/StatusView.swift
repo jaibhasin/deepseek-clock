@@ -44,6 +44,11 @@ struct StatusView: View {
         .background {
             PopoverVisualEffect()
         }
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(.primary.opacity(0.15), lineWidth: 0.5)
+        }
     }
 
     // MARK: - Header

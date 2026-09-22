@@ -4,7 +4,7 @@
 //
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
 //  │ App entry point. Owns the macOS "status item" (the thing in the menu bar)    │
-//  │ and the popover that appears when you click it.                              │
+//  │ and the panel that appears when you click it.                              │
 //  │                                                                              │
 //  │ WHY APPKIT INSTEAD OF SWIFTUI'S `MenuBarExtra`?                              │
 //  │ A hand-rolled `NSStatusItem` gives us direct control over the button's       │
@@ -13,23 +13,26 @@
 //  │ the light/dark appearance changes.                                           │
 //  │                                                                              │
 //  │ The dropdown itself is still 100% SwiftUI (`StatusView`) hosted inside an    │
-//  │ `NSPopover` — we only drop to AppKit for the status item shell.              │
+//  │ `NSPanel` - AppKit handles positioning and keyboard focus.              │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 import AppKit
 import SwiftUI
 
 @main
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
-    /// Single source of truth for pricing state, shared by the icon and popover.
+    /// Single source of truth for pricing state, shared by the icon and panel.
     private let clock = ClockModel()
 
     /// The menu bar item itself.
     private var statusItem: NSStatusItem!
 
     /// The panel shown on click, hosting the SwiftUI `StatusView`.
-    private let popover = NSPopover()
+    private let panel = StatusPanel()
+    private lazy var panelContent = NSHostingController(rootView: StatusView(clock: clock))
+    private var outsideClickMonitor: Any?
+    private var localEventMonitor: Any?
 
     /// Last phase we drew, so we only rebuild the icon when the colour changes
     /// (redrawing the image every tick is wasteful).
@@ -60,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
-        setUpPopover()
+        setUpPanel()
         observeSystemEvents()
 
         // Repaint whenever the model refreshes.
@@ -69,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        removeEventMonitors()
         appearanceObservation?.invalidate()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
@@ -79,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func setUpStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
-        statusItem.button?.action = #selector(togglePopover)
+        statusItem.button?.action = #selector(togglePanel)
         statusItem.button?.image = StatusIcon.image(for: clock.phase)
         statusItem.button?.imagePosition = .imageOnly
 
@@ -89,11 +93,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    private func setUpPopover() {
-        // `.transient` closes the popover automatically when you click elsewhere.
-        popover.behavior = .transient
-        popover.delegate = self
-        popover.contentViewController = NSHostingController(rootView: StatusView(clock: clock))
+    private func setUpPanel() {
+        panel.delegate = self
+        panel.contentViewController = panelContent
     }
 
     /// Subscribes to the system events that can invalidate our cached state.
@@ -129,18 +131,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         clock.pauseTicking()
     }
 
-    // MARK: - NSPopoverDelegate
+    // MARK: - Panel dismissal
 
-    /// The panel shows a live countdown, so switch the model to its fast cadence
-    /// while it is visible, and back to the cheap cadence when it closes.
-    func popoverDidShow(_ notification: Notification) {
-        statusItem.button?.highlight(true)
-        clock.setPanelOpen(true)
+    func windowDidResignKey(_ notification: Notification) {
+        // Let the status button's action handle a second click without reopening.
+        if let button = statusItem.button, let window = button.window {
+            let frame = window.convertToScreen(button.convert(button.bounds, to: nil))
+            if frame.contains(NSEvent.mouseLocation) { return }
+        }
+        closePanel()
     }
 
-    func popoverDidClose(_ notification: Notification) {
+    private func closePanel() {
+        removeEventMonitors()
         statusItem.button?.highlight(false)
         clock.setPanelOpen(false)
+        if panel.isVisible { panel.orderOut(nil) }
+    }
+
+    private func removeEventMonitors() {
+        if let monitor = outsideClickMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = localEventMonitor { NSEvent.removeMonitor(monitor) }
+        outsideClickMonitor = nil
+        localEventMonitor = nil
+    }
+
+    private func monitorPanelDismissal() {
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in self?.closePanel() }
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown]
+        ) { [weak self] event in
+            guard let self else { return event }
+            if event.type == .keyDown {
+                if event.keyCode == 53 {
+                    self.closePanel()
+                    return nil
+                }
+            } else if event.window !== self.panel,
+                      event.window !== self.statusItem.button?.window {
+                self.closePanel()
+            }
+            return event
+        }
     }
 
     // MARK: - Rendering
@@ -173,27 +207,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: - Interaction
 
     /// Clicking the whale toggles the dropdown panel.
-    @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
+    @objc private func togglePanel() {
+        guard let button = statusItem.button, let window = button.window else { return }
 
-        if popover.isShown {
-            popover.performClose(nil)
+        if panel.isVisible {
+            closePanel()
             return
         }
 
-        // Bring the app forward so the popover can take keyboard focus
-        // (needed for the Cmd-Q shortcut inside `StatusView`).
-        NSApp.activate(ignoringOtherApps: true)
-        // `.minY` is the button's lower edge in AppKit's coordinate system.
-        // Anchoring there keeps the panel below the menu bar and the whale visible.
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(
+            NSPoint(x: buttonFrame.midX, y: buttonFrame.midY)
+        ) }) ?? window.screen ?? NSScreen.main else { return }
 
-        // Status-item popovers can be aligned one menu-bar row too high on macOS.
-        // Move the window down by that exact row after AppKit creates it.
-        if let popoverWindow = popover.contentViewController?.view.window {
-            var frame = popoverWindow.frame
-            frame.origin.y -= NSStatusBar.system.thickness
-            popoverWindow.setFrame(frame, display: false)
-        }
+        clock.refresh()
+        // Measure SwiftUI explicitly; fittingSize on an unshown hosting view can be zero.
+        let size = panelContent.sizeThatFits(in: NSSize(width: 292, height: screen.visibleFrame.height))
+        let frame = PanelPlacement.frame(size: size,
+                                         below: buttonFrame, screen: screen.visibleFrame)
+        // Set the final frame before showing, with no popover arrow or repositioning.
+        panel.setFrame(frame, display: false)
+        panel.makeKeyAndOrderFront(nil)
+        statusItem.button?.highlight(true)
+        clock.setPanelOpen(true)
+        monitorPanelDismissal()
     }
 }

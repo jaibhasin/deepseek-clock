@@ -134,10 +134,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// The panel shows a live countdown, so switch the model to its fast cadence
     /// while it is visible, and back to the cheap cadence when it closes.
     func popoverDidShow(_ notification: Notification) {
+        statusItem.button?.highlight(true)
         clock.setPanelOpen(true)
     }
 
     func popoverDidClose(_ notification: Notification) {
+        statusItem.button?.highlight(false)
         clock.setPanelOpen(false)
     }
 
@@ -182,6 +184,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // Bring the app forward so the popover can take keyboard focus
         // (needed for the Cmd-Q shortcut inside `StatusView`).
         NSApp.activate(ignoringOtherApps: true)
+        // `.minY` is the button's lower edge in AppKit's coordinate system.
+        // Anchoring there keeps the panel below the menu bar and the whale visible.
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 }

@@ -38,15 +38,15 @@ final class ClockModel: ObservableObject {
     /// Strong reference to the repeating timer so it isn't deallocated.
     private var timer: Timer?
 
+    /// Called after every refresh. The AppKit shell uses this hook to repaint
+    /// the menu bar icon and tooltip. Keeping it a closure means `ClockModel`
+    /// still imports nothing but Foundation and stays easy to test.
+    var onUpdate: (() -> Void)?
+
     init() {
         // Show correct values immediately, then keep them fresh every second.
         refresh()
         startTicking()
-    }
-
-    /// One combined string for the menu bar label, e.g. "Peak 0h 42m".
-    var menuBarTitle: String {
-        "\(phase == .peak ? "Peak" : "Off-peak") \(countdown)"
     }
 
     // MARK: - Timing
@@ -70,6 +70,8 @@ final class ClockModel: ObservableObject {
 
         let remaining = schedule.nextTransition(after: now)?.timeIntervalSince(now) ?? 0
         countdown = Self.format(remaining)
+
+        onUpdate?()
     }
 
     // MARK: - Formatting

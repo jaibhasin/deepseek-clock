@@ -3,92 +3,105 @@
 //  DeepSeek Clock
 //
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
-//  │ The app entry point plus its tiny UI.                                        │
+//  │ App entry point. Owns the macOS "status item" (the thing in the menu bar)    │
+//  │ and the popover that appears when you click it.                              │
 //  │                                                                              │
-//  │ HOW A MENU BAR APP WORKS                                                     │
-//  │ A normal macOS app owns windows and shows a Dock icon. A "menu bar app"      │
-//  │ instead owns a single status item in the top-right menu bar. SwiftUI models  │
-//  │ that with the `MenuBarExtra` scene (macOS 13+):                              │
+//  │ WHY APPKIT INSTEAD OF SWIFTUI'S `MenuBarExtra`?                              │
+//  │ `MenuBarExtra` draws its label as a *template* image — the system flattens   │
+//  │ it to plain monochrome, which would throw away our green/red signal.        │
+//  │ A hand-rolled `NSStatusItem` lets us set a non-template, pre-tinted image    │
+//  │ (see `StatusIcon.swift`), so the colour reliably survives.                   │
 //  │                                                                              │
-//  │     MenuBarExtra { DROPDOWN } label: { MENU BAR TEXT }                       │
-//  │                                                                              │
-//  │ There is intentionally NO `WindowGroup` here, and `LSUIElement = true` in    │
-//  │ Resources/Info.plist strips the Dock icon — so the app exists ONLY in the    │
-//  │ menu bar.                                                                    │
+//  │ The dropdown itself is still 100% SwiftUI (`StatusView`) hosted inside an    │
+//  │ `NSPopover` — we only drop to AppKit for the status item shell.              │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
-import SwiftUI
 import AppKit
+import SwiftUI
 
 @main
-struct DeepSeekClockApp: App {
+final class AppDelegate: NSObject, NSApplicationDelegate {
 
-    // The single source of truth for the UI. `@StateObject` means SwiftUI
-    // creates it once and keeps it alive for the app's whole lifetime. Because
-    // it is an ObservableObject, every `@Published` change re-renders both the
-    // menu bar label and the dropdown automatically.
-    @StateObject private var clock = ClockModel()
+    /// Single source of truth for pricing state, shared by the icon and popover.
+    private let clock = ClockModel()
 
-    var body: some Scene {
-        MenuBarExtra {
-            // MARK: Dropdown (shown when the menu bar item is clicked)
-            StatusView(clock: clock)
-        } label: {
-            // MARK: Menu bar label (always visible)
-            // e.g. "Off-peak 2h 14m". `.monospacedDigit()` keeps the digits
-            // from jittering sideways as the countdown ticks.
-            Text(clock.menuBarTitle)
-                .monospacedDigit()
-        }
-        // `.window` gives the dropdown a real SwiftUI view (padding, dividers,
-        // buttons) instead of a plain system menu.
-        .menuBarExtraStyle(.window)
+    /// The menu bar item itself.
+    private var statusItem: NSStatusItem!
+
+    /// The panel shown on click, hosting the SwiftUI `StatusView`.
+    private let popover = NSPopover()
+
+    /// Last phase we drew, so we only rebuild the icon when the colour changes
+    /// (the timer ticks every second; redrawing the image every tick is wasteful).
+    private var lastPaintedPhase: PricingPhase?
+
+    // MARK: - Entry point
+
+    /// We are an accessory app: no Dock icon and no app switcher entry, which is
+    /// exactly what a menu bar utility should be. (LSUIElement in Info.plist does
+    /// the same thing for the packaged .app; setting it here also covers `swift run`.)
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        app.setActivationPolicy(.accessory)
+        app.run()
     }
-}
 
-/// Contents of the dropdown panel.
-struct StatusView: View {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setUpStatusItem()
+        setUpPopover()
 
-    // `@ObservedObject` (not `@StateObject`) because the App owns the model;
-    // this view merely observes it and refreshes when it changes.
-    @ObservedObject var clock: ClockModel
+        // Repaint whenever the model refreshes (once a second).
+        clock.onUpdate = { [weak self] in self?.paint() }
+        paint()
+    }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    // MARK: - Setup
 
-            // Header: phase icon + a plain-English status line.
-            HStack(spacing: 8) {
-                Image(systemName: clock.phase.symbol)
-                    .font(.title2)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(clock.phase.title).font(.headline)
-                    Text(clock.phase.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+    private func setUpStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(togglePopover)
+        statusItem.button?.imagePosition = .imageOnly
+    }
 
-            Divider()
+    private func setUpPopover() {
+        // `.transient` closes the popover automatically when you click elsewhere.
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(rootView: StatusView(clock: clock))
+    }
 
-            // The point of the app: how long until the price changes.
-            HStack {
-                Text(clock.phase.changeLabel)
-                Spacer()
-                Text(clock.countdown)
-                    .monospacedDigit()
-                    .fontWeight(.semibold)
-            }
+    // MARK: - Rendering
 
-            Divider()
+    /// Pushes the current phase/countdown into the status item. The icon is only
+    /// rebuilt when the phase (colour) changes; the tooltip updates every tick.
+    private func paint() {
+        guard let button = statusItem.button else { return }
 
-            // A menu bar app has no window to close, so it needs an explicit
-            // way to quit. Cmd-Q works while the panel is focused.
-            Button("Quit DeepSeek Clock") {
-                NSApp.terminate(nil)
-            }
-            .keyboardShortcut("q")
+        if clock.phase != lastPaintedPhase {
+            button.image = StatusIcon.image(for: clock.phase)
+            lastPaintedPhase = clock.phase
         }
-        .padding(12)
-        .frame(width: 250)
+
+        button.toolTip = "\(clock.phase.title) · \(clock.phase.changeLabel) \(clock.countdown)"
+        button.setAccessibilityLabel("DeepSeek pricing: \(clock.phase.title), \(clock.countdown) left")
+    }
+
+    // MARK: - Interaction
+
+    /// Clicking the whale toggles the dropdown panel.
+    @objc private func togglePopover() {
+        guard let button = statusItem.button else { return }
+
+        if popover.isShown {
+            popover.performClose(nil)
+            return
+        }
+
+        // Bring the app forward so the popover can take keyboard focus
+        // (needed for the Cmd-Q shortcut inside `StatusView`).
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 }

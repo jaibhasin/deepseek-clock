@@ -30,49 +30,15 @@ import Foundation
 /// The two pricing phases DeepSeek can be in at any given moment.
 ///
 /// An `enum` is the right tool here because a phase is one of a fixed set of
-/// possibilities. It also lets us hang the UI's presentation strings right next
-/// to the data, so the views stay dumb and this stays the single source of truth.
+/// possibilities. It stays free of any UI concern on purpose: display strings,
+/// colors and icons live in `PricingPhase+UI.swift`, so the rule engine can be
+/// compiled and tested with zero UI dependencies.
 enum PricingPhase: Equatable {
     /// Full price (DeepSeek's documentation calls this "peak").
     case peak
 
     /// 50% discount (all hours outside the peak windows).
     case offPeak
-
-    // MARK: - Presentation helpers (UI text + SF Symbol names)
-
-    /// Big heading shown at the top of the dropdown.
-    var title: String {
-        switch self {
-        case .peak:    return "DeepSeek peak pricing"
-        case .offPeak: return "DeepSeek off-peak pricing"
-        }
-    }
-
-    /// Small grey sub-heading: what the price means in plain English.
-    var subtitle: String {
-        switch self {
-        case .peak:    return "Standard rates"
-        case .offPeak: return "50% cheaper"
-        }
-    }
-
-    /// Label in front of the live countdown.
-    /// Phrased from the user's perspective: "how long until the price changes?"
-    var changeLabel: String {
-        switch self {
-        case .peak:    return "Standard rates end in"
-        case .offPeak: return "Off-peak ends in"
-        }
-    }
-
-    /// Name of the SF Symbol drawn next to the heading (fire = peak, leaf = cheap).
-    var symbol: String {
-        switch self {
-        case .peak:    return "flame.fill"
-        case .offPeak: return "leaf.fill"
-        }
-    }
 }
 
 /// Computes pricing phases and phase-change times from a `Date`.

@@ -28,9 +28,12 @@ rm -rf "${BUNDLE}"
 mkdir -p "${BUNDLE}/Contents/MacOS"
 mkdir -p "${BUNDLE}/Contents/Resources"
 
-# 3. Drop the compiled binary and the metadata plist into place.
+# 3. Drop the compiled binary, the metadata plist, and the whale logo into place.
+#    The logo must be in Contents/Resources so `NSImage(named: "DeepSeekLogo")`
+#    can find it at runtime.
 cp ".build/release/${APP_NAME}" "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "Resources/Info.plist" "${BUNDLE}/Contents/Info.plist"
+cp "Resources/DeepSeekLogo.png" "${BUNDLE}/Contents/Resources/DeepSeekLogo.png"
 
 # 4. Ad-hoc signature ("-") is enough for a locally-built app on the same Mac.
 codesign --force --sign - "${BUNDLE}" >/dev/null 2>&1 || true

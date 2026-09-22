@@ -31,6 +31,8 @@
 //  │   2. draws the whale silhouette + yellow spout centred on the tile            │
 //  │   3. renders the tile at every required size into `AppIcon.iconset/`          │
 //  │   4. hands that folder to Apple's `iconutil` to produce `AppIcon.icns`        │
+//  │   5. also writes a 2048 px `AppIcon-2048.png` master for docs/marketing,      │
+//  │      since macOS itself never uses anything larger than 1024 px.              │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 
@@ -44,6 +46,7 @@ let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let resources = root.appendingPathComponent("Resources", isDirectory: true)
 let iconsetURL = resources.appendingPathComponent("AppIcon.iconset", isDirectory: true)
 let icnsURL = resources.appendingPathComponent("AppIcon.icns")
+let masterURL = resources.appendingPathComponent("AppIcon-2048.png")
 
 // MARK: - The icon's look
 
@@ -317,6 +320,12 @@ guard iconutil.terminationStatus == 0 else {
 // The intermediate iconset is a build artefact, not something we keep around.
 try? FileManager.default.removeItem(at: iconsetURL)
 
-// Keep the working tree clean for Git: the .iconset is regenerated, the .icns is
-// committed so builds do not depend on running this script.
+// A 2048 px master for the README, release notes and anywhere else that wants
+// more pixels than the OS ever asks for. It is not used by the app itself.
+let masterPixels = 2048
+try writePNG(drawIcon(pixels: masterPixels), pixels: masterPixels, to: masterURL)
+
+// Keep the working tree clean for Git: the .iconset is regenerated, the .icns and
+// master PNG are committed so builds do not depend on running this script.
 print("Wrote \(icnsURL.path)")
+print("Wrote \(masterURL.path)")

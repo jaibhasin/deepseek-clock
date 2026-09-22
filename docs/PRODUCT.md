@@ -10,6 +10,13 @@ The user should be able to look at the menu bar and immediately know:
 - whether DeepSeek is currently peak or off-peak (green for off-peak, red for peak)
 - by clicking the menu bar icon, they can see the current rates for the selected model and how long remains until the next peak/off-peak transition
 
+## Panel layout
+
+The countdown to the next price change is the focal point of the dropdown: it is
+shown large and coloured near the top, together with the local time the change
+happens (rendered in the Mac's current time zone). Pricing is supporting detail
+and sits below it in a smaller, muted style.
+
 ## Pricing display
 
 DeepSeek bills per 1M tokens, so there is no single fixed "price per request".

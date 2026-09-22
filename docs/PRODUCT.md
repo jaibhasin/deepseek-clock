@@ -32,7 +32,7 @@ current phase (peak or half-price off-peak).
 
 ## Actions
 
-A compact footer offers two standard macOS buttons: **Open DeepSeek API** (opens
+A compact footer offers two standard macOS buttons: **DeepSeek API** (opens
 the DeepSeek platform console in the default browser) and **Quit**.
 
 ## Future Features

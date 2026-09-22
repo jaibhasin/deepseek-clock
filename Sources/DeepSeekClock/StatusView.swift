@@ -138,7 +138,7 @@ struct StatusView: View {
     /// popover this size. Cmd-Q also works while the panel is focused.
     private var footer: some View {
         HStack(spacing: 8) {
-            Button("Open DeepSeek API") { openConsole() }
+            Button("DeepSeek API") { openConsole() }
                 .frame(maxWidth: .infinity)
 
             Button("Quit") { NSApp.terminate(nil) }

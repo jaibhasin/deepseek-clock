@@ -9,7 +9,6 @@
 //  │     • phase          → is it peak or off-peak right now?                     │
 //  │     • countdown      → "2h 14m" until the price changes                      │
 //  │     • selectedModel  → which model's rate card the user wants to see         │
-//  │     • notifyOnOffPeak → should we alert when cheap pricing begins?           │
 //  │                                                                              │
 //  │ `phase` and `countdown` are recomputed by a *self-rescheduling* timer that    │
 //  │ only wakes the CPU when the on-screen information could actually change:      │
@@ -18,7 +17,7 @@
 //  │     • once a second only while the panel is open and under an hour remains.  │
 //  │ It also refreshes immediately at the next phase transition, and on system     │
 //  │ events such as wake-from-sleep or a time-zone change (see `AppDelegate`).      │
-//  │ The selected model and the notification preference are remembered across      │
+//  │ The selected model is remembered across                                      │
 //  │ launches via `UserDefaults`.                                                  │
 //  │                                                                              │
 //  │ SIDE EFFECTS ARE INJECTED                                                     │
@@ -63,25 +62,14 @@ final class ClockModel: ObservableObject {
         didSet { UserDefaults.standard.set(selectedModel.rawValue, forKey: Self.selectedModelKey) }
     }
 
-    /// Whether the user wants a system notification when peak turns into off-peak.
-    /// The view binds a toggle to this. Persisted on change; switching it on also
-    /// asks macOS for notification permission so the alert can actually appear.
-    @Published var notifyOnOffPeak: Bool = false {
-        didSet {
-            UserDefaults.standard.set(notifyOnOffPeak, forKey: Self.notifyOnOffPeakKey)
-            if notifyOnOffPeak { notifications.requestAuthorization() }
-        }
-    }
-
     /// Current rates for the selected model, already resolved to the live phase.
     /// The view reads this; it is derived, never stored.
     var currentPricing: ModelPricing {
         DeepSeekPricing.pricing(for: selectedModel, phase: phase)
     }
 
-    /// `UserDefaults` keys for the two remembered preferences.
+    /// `UserDefaults` key for the selected model.
     private static let selectedModelKey = "selectedModel"
-    private static let notifyOnOffPeakKey = "notifyOnOffPeak"
 
     /// The rule engine. Stateless, so one instance is enough for the whole app.
     private let schedule = DeepSeekSchedule()
@@ -121,9 +109,8 @@ final class ClockModel: ObservableObject {
             selectedModel = saved
         }
 
-        // Restore the notification preference. `bool(forKey:)` returns `false`
-        // when the key has never been set, which is the default we want.
-        notifyOnOffPeak = UserDefaults.standard.bool(forKey: Self.notifyOnOffPeakKey)
+        // Alerts are always enabled; macOS controls notification permission.
+        notifications.requestAuthorization()
 
         // Show correct values immediately; `refresh()` also arms the timer.
         refresh()
@@ -149,7 +136,7 @@ final class ClockModel: ObservableObject {
         let now = Date()
         let newPhase: PricingPhase = schedule.isPeak(at: now) ? .peak : .offPeak
 
-        if Self.shouldNotifyOffPeak(from: previousPhase, to: newPhase, enabled: notifyOnOffPeak) {
+        if Self.shouldNotifyOffPeak(from: previousPhase, to: newPhase) {
             notifications.notifyOffPeakStarted()
         }
 
@@ -234,16 +221,15 @@ final class ClockModel: ObservableObject {
     }
 
     /// The pure rule behind the notification: alert only when the phase just flipped
-    /// from peak to off-peak *and* the user asked for it.
+    /// from peak to off-peak.
     ///
     /// Extracted as a static function so the decision can be unit-tested without a
     /// timer, a real clock or a real notification center.
     static func shouldNotifyOffPeak(
         from previous: PricingPhase?,
-        to current: PricingPhase,
-        enabled: Bool
+        to current: PricingPhase
     ) -> Bool {
-        enabled && previous == .peak && current == .offPeak
+        previous == .peak && current == .offPeak
     }
 
     // MARK: - Formatting

@@ -39,23 +39,41 @@ final class ClockModelTests: XCTestCase {
 
     /// The alert belongs to exactly one edge: peak → off-peak.
     func testNotifiesOnlyOnPeakToOffPeakCrossing() {
-        XCTAssertTrue(ClockModel.shouldNotifyOffPeak(from: .peak, to: .offPeak, enabled: true))
+        XCTAssertTrue(ClockModel.shouldNotifyOffPeak(from: .peak, to: .offPeak))
 
         // Repeats, reverse crossings and no-ops must all stay silent.
-        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: .offPeak, to: .offPeak, enabled: true))
-        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: .peak, to: .peak, enabled: true))
-        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: .offPeak, to: .peak, enabled: true))
+        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: .offPeak, to: .offPeak))
+        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: .peak, to: .peak))
+        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: .offPeak, to: .peak))
     }
 
     /// The first tick has no previous phase; launching while already off-peak must
     /// not fire a notification.
     func testDoesNotNotifyOnFirstTick() {
-        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: nil, to: .offPeak, enabled: true))
+        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: nil, to: .offPeak))
     }
 
-    /// The setting is an opt-in: disabled means never notify.
-    func testDoesNotNotifyWhenDisabled() {
-        XCTAssertFalse(ClockModel.shouldNotifyOffPeak(from: .peak, to: .offPeak, enabled: false))
+    /// A previously disabled preference must not suppress automatic alerts.
+    func testRequestsAuthorizationEvenWhenLegacyPreferenceIsDisabled() {
+        let defaults = UserDefaults.standard
+        let key = "notifyOnOffPeak"
+        let previousValue = defaults.object(forKey: key)
+        defer {
+            if let previousValue {
+                defaults.set(previousValue, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        defaults.set(false, forKey: key)
+        let notifications = NotificationSpy()
+        let model = ClockModel(notifications: notifications)
+        defer { model.pauseTicking() }
+
+        XCTAssertEqual(notifications.authorizationRequests, 1)
+        XCTAssertEqual(notifications.offPeakAlerts, 0)
+        model.refresh()
+        XCTAssertEqual(notifications.authorizationRequests, 1)
     }
 
     // MARK: - Adaptive refresh cadence
@@ -102,5 +120,18 @@ final class ClockModelTests: XCTestCase {
                        60.05, accuracy: 0.001)
         XCTAssertEqual(ClockModel.secondsUntilNextMinute(from: TestSupport.utc(2026, 9, 21, 12, 0, 30)),
                        30.05, accuracy: 0.001)
+    }
+}
+
+private final class NotificationSpy: NotificationService {
+    private(set) var authorizationRequests = 0
+    private(set) var offPeakAlerts = 0
+
+    func requestAuthorization() {
+        authorizationRequests += 1
+    }
+
+    func notifyOffPeakStarted() {
+        offPeakAlerts += 1
     }
 }

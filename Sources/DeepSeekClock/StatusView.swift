@@ -1,112 +1,98 @@
-//
-//  StatusView.swift
-//  DeepSeek Clock
-//
-//  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
-//  │ The SwiftUI panel shown when the menu bar whale is clicked.                  │
-//  │                                                                              │
-//  │ It is presentation only: every value it shows comes from `ClockModel`, and   │
-//  │ every colour/wording comes from `PricingPhase+UI.swift`. That keeps the UI   │
-//  │ dumb and the pricing logic in one testable place.                            │
-//  └──────────────────────────────────────────────────────────────────────────────┘
-//
-//  LAYOUT PRIORITY
-//  ---------------
-//  The single most important thing a user wants is "when does the price change?".
-//  So the countdown is the hero of this panel: large, coloured and near the top.
-//  The rate card is supporting detail, pushed below the fold and rendered in a
-//  calmer, smaller style so it never competes for attention.
-//
 import SwiftUI
 import AppKit
 
+/// Presentation only; pricing, timing, and model selection come from ClockModel.
 struct StatusView: View {
-
-    // `@ObservedObject` (not `@StateObject`) because the AppDelegate owns the
-    // model; this view only observes it and refreshes when it changes.
     @ObservedObject var clock: ClockModel
+    @Environment(\.colorScheme) private var colorScheme
+
+    // Keep small status text legible on both light and dark surfaces.
+    private var statusColor: Color {
+        switch clock.phase {
+        case .offPeak:
+            return colorScheme == .dark
+                ? Color(red: 0.38, green: 0.85, blue: 0.59)
+                : Color(red: 0.08, green: 0.43, blue: 0.25)
+        case .peak:
+            return colorScheme == .dark
+                ? Color(red: 1, green: 0.55, blue: 0.52)
+                : Color(red: 0.72, green: 0.18, blue: 0.16)
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 14) {
             header
-            Divider()
             hero
-            Divider()
             pricing
-            Divider()
-            notificationToggle
             Divider()
             footer
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(16)
         .frame(width: 292)
-        .background {
-            PopoverVisualEffect()
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color(nsColor: .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.primary.opacity(0.15), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.primary.opacity(0.1), lineWidth: 0.5)
         }
     }
 
-    // MARK: - Header
-
-    /// The whale glyph with its phase-coloured spout, plus the phase name.
     private var header: some View {
-        HStack(spacing: 10) {
-            Image(nsImage: StatusIcon.image(for: clock.phase, size: 26))
-            VStack(alignment: .leading, spacing: 1) {
-                Text(clock.phase.title).font(.headline)
-                Text(clock.phase.subtitle)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(clock.phase.color)
+        HStack(spacing: 9) {
+            Image(nsImage: StatusIcon.image(for: clock.phase, size: 24))
+                .accessibilityHidden(true)
+            Text("DeepSeek")
+                .font(.system(size: 14, weight: .semibold))
+            Spacer()
+            HStack(spacing: 5) {
+                Circle().fill(statusColor).frame(width: 5, height: 5)
+                Text(clock.phase == .offPeak ? "Off-peak" : "Peak")
+                    .font(.system(size: 11, weight: .semibold))
             }
+            .foregroundStyle(statusColor)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(statusColor.opacity(0.1), in: Capsule())
         }
     }
 
-    // MARK: - Hero: when the price changes
-
-    /// The focal point of the panel. A big countdown plus the local clock time it
-    /// lands on, so the answer to "when?" is readable at a glance.
     private var hero: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(clock.phase.changeLabel)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(clock.phase.subtitle)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(statusColor)
 
             Text(clock.countdown)
-                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .font(.system(size: 42, weight: .medium, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(clock.phase.color)
+                .tracking(-1.5)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .accessibilityLabel("\(clock.phase.changeLabel) \(clock.countdown)")
 
-            // The transition rendered in the Mac's own time zone.
-            if let transition = clock.formattedTransition {
-                Text("at \(transition)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(clock.phase == .offPeak ? "Off-peak ends" : "Standard rates end")
+                if let transition = clock.formattedTransition {
+                    Text("at \(transition)")
+                }
             }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 2)
     }
 
-    // MARK: - Supporting detail: rates
-
-    /// The rate card, deliberately quieter than the hero: smaller type, muted
-    /// labels, and its own model picker so both models fit without crowding.
     private var pricing: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Pricing")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                Text("Current rates")
+                    .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("USD per 1M tokens")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                Text("USD / 1M tokens")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
 
             Picker("Model", selection: $clock.selectedModel) {
@@ -116,84 +102,60 @@ struct StatusView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .frame(maxWidth: .infinity)
 
-            VStack(spacing: 3) {
+            VStack(spacing: 10) {
                 priceRow("Input · cache hit", clock.currentPricing.inputCacheHit)
                 priceRow("Input · cache miss", clock.currentPricing.inputCacheMiss)
+                Divider()
                 priceRow("Output", clock.currentPricing.output)
             }
         }
+        .padding(12)
+        .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.primary.opacity(0.06), lineWidth: 0.5)
+        }
     }
 
-    /// One "label .................. $0.30" line of the rate card.
-    ///
-    /// The value is rendered with `USDPriceFormatter` so every price uses the
-    /// same currency style, and `monospacedDigit()` keeps the decimal points
-    /// aligned as the numbers change when the phase flips.
     private func priceRow(_ label: String, _ value: Decimal) -> some View {
         HStack {
             Text(label)
                 .foregroundStyle(.secondary)
-            Spacer()
+            Spacer(minLength: 8)
             Text(USDPriceFormatter.string(value))
                 .monospacedDigit()
-                .fontWeight(.medium)
+                .fontWeight(.semibold)
         }
-        .font(.caption)
+        .font(.system(size: 11))
+        .accessibilityElement(children: .combine)
     }
 
-    // MARK: - Notifications setting
-
-    /// A single standard macOS switch, bound straight to the persisted preference.
-    /// `.small` + caption type keep it compact so the panel stays lightweight.
-    /// Turning it on triggers the one-time system permission prompt via the model.
-    private var notificationToggle: some View {
-        Toggle("Notify me when off-peak starts", isOn: $clock.notifyOnOffPeak)
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .font(.caption)
-    }
-
-    // MARK: - Footer
-
-    /// A compact row of standard macOS buttons: open the DeepSeek platform console
-    /// or quit. Bordered buttons and a small control size are the native look for a
-    /// popover this size. Cmd-Q also works while the panel is focused.
     private var footer: some View {
-        HStack(spacing: 8) {
-            Button("DeepSeek Console") { openConsole() }
-                .frame(maxWidth: .infinity)
+        HStack {
+            Button(action: openConsole) {
+                HStack(spacing: 5) {
+                    Text("DeepSeek Console")
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+            }
+            .help("Open the DeepSeek Console in your browser")
+
+            Spacer()
 
             Button("Quit") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
-                .frame(maxWidth: .infinity)
+                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderless)
         .controlSize(.small)
+        .font(.system(size: 11, weight: .medium))
     }
 
-    /// Opens the DeepSeek platform console in the default browser.
-    ///
-    /// `NSWorkspace` is the standard AppKit way to hand a URL to the user's chosen
-    /// browser, and it costs us nothing until the button is actually clicked.
     private func openConsole() {
-        guard let url = URL(string: "https://platform.deepseek.com") else {
-            return
-        }
+        guard let url = URL(string: "https://platform.deepseek.com") else { return }
         NSWorkspace.shared.open(url)
     }
-}
-
-/// Keeps the panel translucent against the desktop while using AppKit's native
-/// popover material, so it follows the user's appearance and wallpaper colors.
-private struct PopoverVisualEffect: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .popover
-        view.blendingMode = .behindWindow
-        view.state = .active
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

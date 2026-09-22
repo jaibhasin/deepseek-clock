@@ -4,23 +4,33 @@
 //
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
 //  │ Builds `Resources/AppIcon.icns`, the artwork macOS shows in the Finder,       │
-//  │ Dock and About box, from the single source image `DeepSeekLogo.png`.          │
+//  │ Dock and About box.                                                          │
 //  │                                                                              │
 //  │ WHY A SCRIPT?                                                                │
 //  │ Mac app icons are not one image — they are a set of PNGs at fixed sizes      │
 //  │ (16…1024 px) packaged into a `.icns`. Rather than check ten resized PNGs      │
-//  │ into Git, we draw each size on demand from the logo, so there is exactly one │
-//  │ source of truth and the result is reproducible.                              │
+//  │ into Git, we DRAW each size on demand, so there is exactly one source of      │
+//  │ truth (this file) and the result is reproducible.                            │
+//  │                                                                              │
+//  │ WHY DRAW THE WHALE IN CODE (NOT A LOGO PNG)?                                 │
+//  │ The menu bar glyph is itself drawn in code (`StatusIcon.swift`), so reusing   │
+//  │ the same Bézier shapes here keeps the app icon and the menu bar icon looking  │
+//  │ like the same character. No bitmap to keep in sync, and every size stays      │
+//  │ crisp because we render fresh at each resolution.                             │
+//  │                                                                              │
+//  │ THE LOOK: a funky neon squircle (pink → violet → cyan) with the white whale   │
+//  │ and its sunshine-yellow spout, so the icon feels playful while still reading  │
+//  │ as "the DeepSeek clock whale".                                                │
 //  │                                                                              │
 //  │ HOW TO RUN (from the repository root, on macOS):                             │
 //  │                                                                              │
 //  │     swift Scripts/make-appicon.swift                                         │
 //  │                                                                              │
 //  │ WHAT IT DOES                                                                 │
-//  │   1. draws a rounded-rectangle ("squircle") tile with a blue gradient        │
-//  │   2. tints the navy whale white and centres it on the tile                   │
-//  │   3. renders the tile at every required size into `AppIcon.iconset/`         │
-//  │   4. hands that folder to Apple's `iconutil` to produce `AppIcon.icns`       │
+//  │   1. draws a rounded-rectangle ("squircle") tile with a funky gradient        │
+//  │   2. draws the whale silhouette + yellow spout centred on the tile            │
+//  │   3. renders the tile at every required size into `AppIcon.iconset/`          │
+//  │   4. hands that folder to Apple's `iconutil` to produce `AppIcon.icns`        │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 
@@ -32,21 +42,24 @@ import AppKit
 // so the script behaves the same no matter where the user's shell is pointed.
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let resources = root.appendingPathComponent("Resources", isDirectory: true)
-let logoURL = resources.appendingPathComponent("DeepSeekLogo.png")
 let iconsetURL = resources.appendingPathComponent("AppIcon.iconset", isDirectory: true)
 let icnsURL = resources.appendingPathComponent("AppIcon.icns")
 
-guard let logo = NSImage(contentsOf: logoURL) else {
-    FileHandle.standardError.write(Data("error: cannot read \(logoURL.path)\n".utf8))
-    exit(1)
-}
-
 // MARK: - The icon's look
 
-/// Colours for the background gradient. DeepSeek's brand blue, light at the top
-/// fading to a deeper blue at the bottom for a little depth.
-let topBlue = NSColor(calibratedRed: 0.13, green: 0.42, blue: 0.91, alpha: 1)
-let bottomBlue = NSColor(calibratedRed: 0.05, green: 0.19, blue: 0.58, alpha: 1)
+/// Background gradient stops, drawn top-left to bottom-right. A hot pink fading
+/// through electric violet into cyan — loud on purpose, so the icon pops in the
+/// Dock and Finder next to utility apps.
+let gradientPink = NSColor(srgbRed: 1.00, green: 0.13, blue: 0.55, alpha: 1)
+let gradientViolet = NSColor(srgbRed: 0.55, green: 0.15, blue: 0.98, alpha: 1)
+let gradientCyan = NSColor(srgbRed: 0.00, green: 0.83, blue: 0.98, alpha: 1)
+
+/// The whale silhouette: clean white reads best against the saturated background.
+let whaleWhite = NSColor.white
+
+/// The spout keeps its role as the "indicator" from the menu bar, but in a fun
+/// sunshine yellow instead of the red/green peak/off-peak states.
+let spoutYellow = NSColor(srgbRed: 1.00, green: 0.89, blue: 0.30, alpha: 1)
 
 /// macOS icons leave a transparent margin around the artwork; ~9% per side matches
 /// the visual weight of system icons.
@@ -58,7 +71,7 @@ let cornerFraction: CGFloat = 0.2245
 
 /// The whale occupies this fraction of the tile's width, leaving comfortable
 /// breathing room inside the rounded background.
-let whaleFraction: CGFloat = 0.62
+let whaleFraction: CGFloat = 0.64
 
 /// Draws the finished icon at `pixels` × `pixels`.
 ///
@@ -73,11 +86,27 @@ func drawIcon(pixels: Int) -> NSImage {
         let tile = rect.insetBy(dx: side * paddingFraction, dy: side * paddingFraction)
         let radius = tile.width * cornerFraction
         let shape = NSBezierPath(roundedRect: tile, xRadius: radius, yRadius: radius)
-        NSGradient(starting: topBlue, ending: bottomBlue)?.draw(in: shape, angle: -90)
+        NSGradient(colors: [gradientPink, gradientViolet, gradientCyan])?
+            .draw(in: shape, angle: -45)
 
-        // 2. White whale, centred on the tile. `sourceAtop` repaints only the
-        //    pixels the logo already made opaque, turning the silhouette white
-        //    while leaving its transparent surroundings untouched.
+        // Everything below is clipped to the tile so the whale's shadow cannot
+        // spill into the transparent margin.
+        NSGraphicsContext.saveGraphicsState()
+        shape.addClip()
+
+        // 2. A faint inner stroke around the tile — the "sticker" outline that
+        //    makes the flat colour feel like a physical object.
+        let strokeWidth = max(1, side * 0.012)
+        let inner = NSBezierPath(
+            roundedRect: tile.insetBy(dx: strokeWidth / 2, dy: strokeWidth / 2),
+            xRadius: radius - strokeWidth / 2,
+            yRadius: radius - strokeWidth / 2
+        )
+        inner.lineWidth = strokeWidth
+        NSColor.white.withAlphaComponent(0.22).setStroke()
+        inner.stroke()
+
+        // 3. The whale itself, centred on the tile.
         let whaleSide = tile.width * whaleFraction
         let whaleRect = NSRect(
             x: tile.midX - whaleSide / 2,
@@ -85,15 +114,133 @@ func drawIcon(pixels: Int) -> NSImage {
             width: whaleSide,
             height: whaleSide
         )
-        let whiteWhale = NSImage(size: whaleRect.size, flipped: false) { whaleDrawingRect in
-            logo.draw(in: whaleDrawingRect, from: .zero, operation: .sourceOver, fraction: 1)
-            NSColor.white.set()
-            whaleDrawingRect.fill(using: .sourceAtop)
-            return true
-        }
-        whiteWhale.draw(in: whaleRect, from: .zero, operation: .sourceOver, fraction: 1)
+        drawWhale(in: whaleRect)
 
+        NSGraphicsContext.restoreGraphicsState()
         return true
+    }
+}
+
+// MARK: - The whale
+
+/// Paints the whale silhouette and its spout inside `rect`.
+///
+/// The body, tail and fin are separate paths sharing one fill colour, so they fuse
+/// into a single solid silhouette; the spout is painted last in yellow so it reads
+/// as a bright plume above the head. A soft shadow is dropped first to lift the
+/// whale off the gradient.
+func drawWhale(in rect: NSRect) {
+    // Soft drop shadow: one combined silhouette nudged down a touch.
+    let silhouette = NSBezierPath()
+    silhouette.append(bodyPath(in: rect))
+    silhouette.append(tailPath(in: rect))
+    silhouette.append(finPath(in: rect))
+
+    NSGraphicsContext.saveGraphicsState()
+    let drop = NSAffineTransform()
+    drop.translateX(by: 0, yBy: -rect.height * 0.035)
+    drop.concat()
+    NSColor.black.withAlphaComponent(0.18).setFill()
+    silhouette.fill()
+    NSGraphicsContext.restoreGraphicsState()
+
+    // Body + tail + fin in white, the spout in yellow.
+    whaleWhite.setFill()
+    bodyPath(in: rect).fill()
+    tailPath(in: rect).fill()
+    finPath(in: rect).fill()
+
+    spoutYellow.setFill()
+    spoutPath(in: rect).fill()
+}
+
+// These four shapes mirror `StatusIcon.swift` so the app icon and the menu bar
+// glyph are unmistakably the same whale. Each is authored in a 0…1 "unit box" and
+// stretched into `rect`, so it scales cleanly from 16 px to 1024 px.
+
+/// The rounded head-and-body blob. The dip on the right is the back, which the
+/// tail attaches to.
+func bodyPath(in rect: NSRect) -> NSBezierPath {
+    let path = NSBezierPath()
+    let p = point(in: rect)
+
+    path.move(to: p(0.06, 0.44))                         // nose (left tip)
+    path.curve(to: p(0.44, 0.66),                        // over the top of the head
+               controlPoint1: p(0.10, 0.68),
+               controlPoint2: p(0.26, 0.70))
+    path.curve(to: p(0.68, 0.50),                        // back, sloping to the tail
+               controlPoint1: p(0.58, 0.64),
+               controlPoint2: p(0.68, 0.58))
+    path.curve(to: p(0.62, 0.28),                        // down the rear of the body
+               controlPoint1: p(0.68, 0.40),
+               controlPoint2: p(0.66, 0.34))
+    path.curve(to: p(0.06, 0.44),                        // along the belly to the nose
+               controlPoint1: p(0.32, 0.16),
+               controlPoint2: p(0.10, 0.22))
+    path.close()
+    return path
+}
+
+/// The tail: two solid triangular lobes meeting at a notch, the simplest way a
+/// whale fluke is drawn in a pictogram.
+func tailPath(in rect: NSRect) -> NSBezierPath {
+    let path = NSBezierPath()
+    let p = point(in: rect)
+
+    path.move(to: p(0.58, 0.50))                         // attach to the upper back
+    path.curve(to: p(0.93, 0.64),                        // sweep out to the top tip
+               controlPoint1: p(0.76, 0.56),
+               controlPoint2: p(0.87, 0.64))
+    path.line(to: p(0.79, 0.45))                         // in to the central notch
+    path.line(to: p(0.94, 0.26))                         // back out to the bottom tip
+    path.curve(to: p(0.58, 0.38),                        // sweep in to the lower back
+               controlPoint1: p(0.87, 0.26),
+               controlPoint2: p(0.76, 0.32))
+    path.close()
+    return path
+}
+
+/// The small pectoral fin hanging under the body.
+func finPath(in rect: NSRect) -> NSBezierPath {
+    let path = NSBezierPath()
+    let p = point(in: rect)
+
+    path.move(to: p(0.46, 0.32))
+    path.curve(to: p(0.40, 0.10),                        // down to the fin tip
+               controlPoint1: p(0.48, 0.26),
+               controlPoint2: p(0.44, 0.12))
+    path.curve(to: p(0.28, 0.24),                        // back up into the body
+               controlPoint1: p(0.32, 0.10),
+               controlPoint2: p(0.30, 0.17))
+    path.close()
+    return path
+}
+
+/// The water spout: a tall central plume with a droplet either side. Ellipses
+/// are enough at this size and stay readable when shrunk to 16 px.
+func spoutPath(in rect: NSRect) -> NSBezierPath {
+    let path = NSBezierPath()
+    let p = point(in: rect)
+
+    // A filled ellipse from a normalised centre + size.
+    func drop(_ cx: CGFloat, _ cy: CGFloat, _ w: CGFloat, _ h: CGFloat) {
+        let origin = p(cx - w / 2, cy)
+        let size = NSSize(width: w * rect.width, height: h * rect.height)
+        path.appendOval(in: NSRect(origin: origin, size: size))
+    }
+
+    drop(0.20, 0.61, 0.13, 0.34)                         // central plume
+    drop(0.105, 0.71, 0.065, 0.14)                       // left droplet
+    drop(0.295, 0.71, 0.065, 0.14)                       // right droplet
+    return path
+}
+
+/// Maps normalised 0…1 coordinates into `rect`, so one set of numbers can be
+/// reused at any icon size. `(0, 0)` is the bottom-left, `(1, 1)` the top-right.
+func point(in rect: NSRect) -> (CGFloat, CGFloat) -> NSPoint {
+    { x, y in
+        NSPoint(x: rect.minX + x * rect.width,
+                y: rect.minY + y * rect.height)
     }
 }
 

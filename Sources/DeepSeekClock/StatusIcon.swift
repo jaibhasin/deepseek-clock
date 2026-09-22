@@ -136,9 +136,9 @@ enum StatusIcon {
             path.appendOval(in: NSRect(origin: origin, size: size))
         }
 
-        drop(0.20, 0.62, 0.11, 0.30)                         // central plume
-        drop(0.11, 0.72, 0.055, 0.12)                        // left droplet
-        drop(0.29, 0.72, 0.055, 0.12)                        // right droplet
+        drop(0.20, 0.61, 0.13, 0.34)                         // central plume
+        drop(0.105, 0.71, 0.065, 0.14)                       // left droplet
+        drop(0.295, 0.71, 0.065, 0.14)                       // right droplet
         return path
     }
 

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Info.plist
+  DeepSeek Clock
+
+  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
+  │ Every macOS .app bundle carries an Info.plist describing what it is. This    │
+  │ one's most important line is `LSUIElement`.                                  │
+  │                                                                              │
+  │   LSUIElement = true  →  "agent app": no Dock icon, no app switcher entry,   │
+  │                          no menu bar menus — it lives only as a status item.  │
+  │                                                                              │
+  │ The other keys just give the bundle an identity and a minimum OS version.    │
+  └──────────────────────────────────────────────────────────────────────────────┘
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Name shown in the menu bar item's tooltip / Activity Monitor. -->
+	<key>CFBundleName</key>
+	<string>DeepSeek Clock</string>
+
+	<key>CFBundleDisplayName</key>
+	<string>DeepSeek Clock</string>
+
+	<!-- Reverse-DNS style unique identifier for the app. -->
+	<key>CFBundleIdentifier</key>
+	<string>com.local.deepseek-clock</string>
+
+	<!-- Must match the binary name that build.sh copies into Contents/MacOS. -->
+	<key>CFBundleExecutable</key>
+	<string>DeepSeekClock</string>
+
+	<!-- APPL = a regular application bundle. -->
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+
+	<key>CFBundleVersion</key>
+	<string>1</string>
+
+	<!-- Refuse to launch on anything older than macOS 13 (Ventura). -->
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+
+	<!-- The magic switch: hide the Dock icon so this is menu-bar-only. -->
+	<key>LSUIElement</key>
+	<true/>
+</dict>
+</plist>

@@ -1,27 +1,27 @@
 # DeepSeek Clock
 
-DeepSeek Clock is a native macOS menu bar app that shows whether DeepSeek API pricing is peak or off-peak.
+See whether DeepSeek API pricing is peak or off-peak, right from your Mac's menu bar.
 
-Click the menu bar icon to see the countdown to the next transition, local transition time, and current rates for Flash and V4 Pro.
+Click the icon to see how long until prices change, when that happens in your timezone, and the current rates for Flash and V4 Pro.
 
 ## Pricing schedule
 
 - Peak: Monday-Friday, 01:00-04:00 and 06:00-10:00 UTC.
-- Off-peak: all other times.
-- Off-peak prices are 50% of peak prices.
-- Transition times are displayed in the Mac's local timezone.
-- Pricing is calculated locally from the rate table in `Sources/DeepSeekClock/DeepSeekPricing.swift`.
+- Off-peak: all other times, at half price.
+
+Times are shown in your Mac's local timezone.
+The app works out pricing locally using the rates in `Sources/DeepSeekClock/DeepSeekPricing.swift`.
 
 ## Build and run
 
-Requires macOS 13+ and Swift 5.9 or later.
+You'll need macOS 13+ and Swift 5.9 or later.
 
 ```sh
 ./build.sh
 open DeepSeekClock.app
 ```
 
-The app runs entirely as a menu bar utility and requires no account or backend.
+The app lives in your menu bar, with no account or backend needed.
 
 ## Tests
 

@@ -22,6 +22,17 @@ No account or backend needed.
 Times are shown in your Mac's local timezone.
 The app works out pricing locally using the rates in `Sources/DeepSeekClock/DeepSeekPricing.swift`.
 
+## Install
+
+Requires an Apple Silicon Mac running macOS 13 or later.
+
+```sh
+brew install --cask jaibhasin/tap/deepseek-clock
+```
+
+Then open DeepSeek Clock from Applications.
+The app is not notarized, so macOS may require approval in System Settings > Privacy & Security on first launch.
+
 ## Build and run
 
 You'll need macOS 13+ and Swift 5.9 or later.

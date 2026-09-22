@@ -1,9 +1,6 @@
 # macOS metadata
 .DS_Store
 
-# Agent instructions (kept local, intentionally not shared)
-AGENTS.md
-
 # Swift Package Manager build output
 .build/
 .swiftpm/

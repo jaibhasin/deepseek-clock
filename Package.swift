@@ -43,6 +43,16 @@ let package = Package(
         .executableTarget(
             name: "DeepSeekClock",
             path: "Sources/DeepSeekClock"
+        ),
+
+        // Unit tests for the pure business logic (schedule + pricing). SwiftPM
+        // supports testing executable targets since Swift 5.5, so the tests can
+        // `@testable import DeepSeekClock` without splitting the app into an
+        // extra library target. These run in CI, not during normal development.
+        .testTarget(
+            name: "DeepSeekClockTests",
+            dependencies: ["DeepSeekClock"],
+            path: "Tests/DeepSeekClockTests"
         )
     ]
 )

@@ -1,5 +1,5 @@
 ---
-description: Creates small atomic Git commits from already staged changes
+description: Handles Git commits whenever the main agent finishes a small logical change. Use automatically without waiting for the user.
 mode: subagent
 ---
 

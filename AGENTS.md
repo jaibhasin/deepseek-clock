@@ -49,10 +49,14 @@ Do not remove, weaken, or skip tests just to make CI pass.
 If CI fails, inspect the failure, fix the underlying issue, commit the fix, and push again.
 
 ## Git Workflow
-Commit frequently.
-Local commits are encouraged even for small meaningful changes.
-Make git messages clear and descriptive without adding unnecessary verbosity and co-authorship.
-Prefer many small, focused commits over large commits containing unrelated changes.
-Create commits even for small but meaningful changes.
-Each commit should represent one logical change.
-Keep giignore files up to date.
+- Commit extremely frequently.
+- Prefer very small atomic commits over larger commits.
+- A commit may contain only 1-3 changed lines if those lines form a meaningful logical change.
+- Do not wait until an entire feature is complete before committing.
+- Whenever a small logical unit of work is complete, stage only that unit and automatically invoke the `git-committer` subagent.
+- Do not wait for the user to request a commit.
+- Pass the `git-committer` a concise summary and suggested commit message so it does not need to analyze the full diff.
+
+
+# General Rules
+- Treat committing completed logical changes as part of the implementation workflow, not as an end-of-task cleanup step.

@@ -1,0 +1,24 @@
+name: CI
+
+# Build the app and run the unit tests on every push and pull request. Per
+# AGENTS.md the tests are executed here in CI rather than on the developer's Mac.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test

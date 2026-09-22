@@ -5,12 +5,14 @@
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
 //  │ The "view model" that glues the pure rules in `DeepSeekSchedule` to the UI.  │
 //  │                                                                              │
-//  │ It owns two pieces of published state that the menu bar renders:            │
-//  │     • phase     → is it peak or off-peak right now?                          │
-//  │     • countdown → "2h 14m" until the price changes                           │
+//  │ It owns the published state that the menu bar renders:                       │
+//  │     • phase         → is it peak or off-peak right now?                      │
+//  │     • countdown     → "2h 14m" until the price changes                       │
+//  │     • selectedModel → which model's rate card the user wants to see          │
 //  │                                                                              │
-//  │ Those two values are recomputed once a second by a `Timer`, so the menu bar  │
-//  │ label ticks down live without any manual refresh.                            │
+//  │ `phase` and `countdown` are recomputed once a second by a `Timer`, so the     │
+//  │ menu bar label ticks down live without any manual refresh. The selected model │
+//  │ is remembered across launches via `UserDefaults`.                            │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 //  WHAT IS `ObservableObject`?
@@ -32,6 +34,22 @@ final class ClockModel: ObservableObject {
     /// Human-readable time until the next phase change, e.g. "2h 14m".
     @Published private(set) var countdown: String = "--"
 
+    /// Which model's rate card the dropdown shows. The view binds its picker to
+    /// this, so it must be publicly settable. It is persisted on every change so
+    /// the user's choice survives quitting and relaunching the app.
+    @Published var selectedModel: DeepSeekModel = .flash {
+        didSet { UserDefaults.standard.set(selectedModel.rawValue, forKey: Self.selectedModelKey) }
+    }
+
+    /// Current rates for the selected model, already resolved to the live phase.
+    /// The view reads this; it is derived, never stored.
+    var currentPricing: ModelPricing {
+        DeepSeekPricing.pricing(for: selectedModel, phase: phase)
+    }
+
+    /// `UserDefaults` key for remembering the selected model between launches.
+    private static let selectedModelKey = "selectedModel"
+
     /// The rule engine. Stateless, so one instance is enough for the whole app.
     private let schedule = DeepSeekSchedule()
 
@@ -44,6 +62,14 @@ final class ClockModel: ObservableObject {
     var onUpdate: (() -> Void)?
 
     init() {
+        // Restore the model the user last picked, if any. Assigning here does not
+        // trigger the `didSet` observer (property observers are skipped during
+        // initialization), so we do not immediately write the value back.
+        if let raw = UserDefaults.standard.string(forKey: Self.selectedModelKey),
+           let saved = DeepSeekModel(rawValue: raw) {
+            selectedModel = saved
+        }
+
         // Show correct values immediately, then keep them fresh every second.
         refresh()
         startTicking()

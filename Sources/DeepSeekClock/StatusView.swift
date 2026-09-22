@@ -36,6 +36,30 @@ struct StatusView: View {
 
             Divider()
 
+            // Model toggle. DeepSeek prices two models, and showing both at once
+            // would crowd this small panel, so the user picks one to inspect.
+            Picker("Model", selection: $clock.selectedModel) {
+                ForEach(DeepSeekModel.allCases) { model in
+                    Text(model.displayName).tag(model)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            // Current rate card for the selected model, already resolved to the
+            // live phase (peak or off-peak) by `ClockModel.currentPricing`.
+            VStack(alignment: .leading, spacing: 4) {
+                Text("USD per 1M tokens")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                priceRow("Input · cache hit", clock.currentPricing.inputCacheHit)
+                priceRow("Input · cache miss", clock.currentPricing.inputCacheMiss)
+                priceRow("Output", clock.currentPricing.output)
+            }
+
+            Divider()
+
             // The point of the app: how long until the price changes.
             HStack {
                 Text(clock.phase.changeLabel)
@@ -56,5 +80,21 @@ struct StatusView: View {
         }
         .padding(12)
         .frame(width: 250)
+    }
+
+    /// One "label .................. $0.30" line of the rate card.
+    ///
+    /// The value is rendered with `USDPriceFormatter` so every price uses the
+    /// same currency style, and `monospacedDigit()` keeps the decimal points
+    /// aligned as the numbers change when the phase flips.
+    private func priceRow(_ label: String, _ value: Decimal) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(USDPriceFormatter.string(value))
+                .monospacedDigit()
+                .fontWeight(.medium)
+        }
+        .font(.callout)
     }
 }

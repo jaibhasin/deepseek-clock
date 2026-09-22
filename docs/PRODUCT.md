@@ -8,7 +8,20 @@ DeepSeek API pricing is currently peak or off-peak.
 The user should be able to look at the menu bar and immediately know:
 
 - whether DeepSeek is currently peak or off-peak (green for off-peak, red for peak)
-- by clicking the menu bar icon, they can see the current price per request and the time until the next peak/off-peak transition.- how long remains until that transition
+- by clicking the menu bar icon, they can see the current rates for the selected model and how long remains until the next peak/off-peak transition
+
+## Pricing display
+
+DeepSeek bills per 1M tokens, so there is no single fixed "price per request".
+The dropdown shows the published rate card in USD per 1M tokens:
+
+- input (cache hit)
+- input (cache miss)
+- output
+
+A segmented toggle switches between `deepseek-flash` and `deepseek-v4-pro`;
+the chosen model is remembered across launches. Rates shown already reflect the
+current phase (peak or half-price off-peak).
 
 ## Future Features
 

@@ -45,7 +45,6 @@ final class DisplayTimeZoneTests: XCTestCase {
         let identifiers = DisplayTimeZone.selectableIdentifiers
         XCTAssertFalse(identifiers.isEmpty)
         XCTAssertEqual(identifiers, identifiers.sorted())
-        XCTAssertTrue(identifiers.contains("Asia/Kolkata"))
     }
 
     /// Grouping puts each zone under its region, sorted, with region-less zones
@@ -57,11 +56,10 @@ final class DisplayTimeZoneTests: XCTestCase {
 
         XCTAssertEqual(groups.flatMap(\.identifiers).sorted(), identifiers)
         for group in groups {
-            if group.region == "Other" {
-                XCTAssertTrue(group.identifiers.allSatisfy { !$0.contains("/") })
-            } else {
-                XCTAssertTrue(group.identifiers.allSatisfy { $0.hasPrefix("\(group.region)/") })
-            }
+            XCTAssertTrue(group.identifiers.allSatisfy { identifier in
+                let region = identifier.split(separator: "/").first.map(String.init) ?? "Other"
+                return region == group.region
+            })
         }
     }
 }

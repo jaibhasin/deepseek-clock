@@ -4,6 +4,11 @@ import AppKit
 /// Presentation only; pricing, timing, and model selection come from ClockModel.
 struct StatusView: View {
     @ObservedObject var clock: ClockModel
+
+    /// Opens the standalone settings window. Owned by the AppKit shell so this
+    /// view stays presentation-only.
+    var onOpenSettings: () -> Void = {}
+
     @Environment(\.colorScheme) private var colorScheme
 
     // Keep small status text legible on both light and dark surfaces.
@@ -82,9 +87,14 @@ struct StatusView: View {
                 if let transition = clock.formattedTransition {
                     Text("at \(transition)")
                 }
+                if let zone = clock.displayTimeZone.shortLabel {
+                    Text("(\(zone))")
+                }
             }
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 2)
@@ -150,6 +160,13 @@ struct StatusView: View {
             .help("Open the DeepSeek Console in your browser")
 
             Spacer()
+
+            Button(action: onOpenSettings) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .help("Settings")
+            .accessibilityLabel("Settings")
 
             Button("Quit") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")

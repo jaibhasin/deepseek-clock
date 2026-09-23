@@ -41,6 +41,13 @@ struct DisplayTimeZone: Equatable {
         return zone
     }
 
+    /// Short city label for a non-system selection, e.g. "Asia/Kolkata", or `nil`
+    /// when following the system zone (or when the stored identifier is unknown).
+    var shortLabel: String? {
+        guard let identifier, TimeZone(identifier: identifier) != nil else { return nil }
+        return identifier.replacingOccurrences(of: "_", with: " ")
+    }
+
     /// Label for the current selection, e.g. "System (Asia/Kolkata)".
     var displayName: String {
         if isSystem {

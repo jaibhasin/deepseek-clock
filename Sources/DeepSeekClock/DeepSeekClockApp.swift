@@ -30,7 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// The panel shown on click, hosting the SwiftUI `StatusView`.
     private let panel = StatusPanel()
-    private lazy var panelContent = NSHostingController(rootView: StatusView(clock: clock))
+    private lazy var panelContent = NSHostingController(
+        rootView: StatusView(clock: clock, onOpenSettings: { [weak self] in self?.openSettings() })
+    )
+
+    /// Owns the standalone settings window, created on first use.
+    private lazy var settingsWindow = SettingsWindowController(clock: clock)
     private var outsideClickMonitor: Any?
     private var localEventMonitor: Any?
 
@@ -189,6 +194,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     // MARK: - Interaction
+
+    /// Opens the settings window from the gear button in the panel footer.
+    private func openSettings() {
+        closePanel()
+        settingsWindow.show()
+    }
 
     /// Clicking the whale toggles the dropdown panel.
     @objc private func togglePanel() {

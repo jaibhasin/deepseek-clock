@@ -52,7 +52,7 @@ final class ClockModel: ObservableObject {
     /// The next transition as a local wall-clock time, e.g. "4:00 AM", or `nil`
     /// while we have not computed one yet.
     var formattedTransition: String? {
-        transitionDate.map(Self.formatTransition)
+        transitionDate.map(transitionText)
     }
 
     /// Which model's rate card the dropdown shows. The view binds its picker to
@@ -60,6 +60,19 @@ final class ClockModel: ObservableObject {
     /// the user's choice survives quitting and relaunching the app.
     @Published var selectedModel: DeepSeekModel = .flash {
         didSet { UserDefaults.standard.set(selectedModel.rawValue, forKey: Self.selectedModelKey) }
+    }
+
+    /// Time zone used to display transition times.
+    ///
+    /// DeepSeek's peak/off-peak schedule is always computed in UTC, so this only
+    /// affects the wall-clock time the user sees. Defaults to the system zone and
+    /// is persisted so the choice survives quitting and relaunching the app.
+    @Published var displayTimeZone: DisplayTimeZone = .system {
+        didSet {
+            guard displayTimeZone != oldValue else { return }
+            UserDefaults.standard.set(displayTimeZone.identifier, forKey: Self.displayTimeZoneKey)
+            refresh()
+        }
     }
 
     /// Current rates for the selected model, already resolved to the live phase.
@@ -70,6 +83,9 @@ final class ClockModel: ObservableObject {
 
     /// `UserDefaults` key for the selected model.
     private static let selectedModelKey = "selectedModel"
+
+    /// `UserDefaults` key for the chosen display time zone. Absent = system zone.
+    private static let displayTimeZoneKey = "displayTimeZoneIdentifier"
 
     /// The rule engine. Stateless, so one instance is enough for the whole app.
     private let schedule = DeepSeekSchedule()
@@ -107,6 +123,11 @@ final class ClockModel: ObservableObject {
         if let raw = UserDefaults.standard.string(forKey: Self.selectedModelKey),
            let saved = DeepSeekModel(rawValue: raw) {
             selectedModel = saved
+        }
+
+        // Restore the display time zone, if the user ever chose one.
+        if let savedZone = UserDefaults.standard.string(forKey: Self.displayTimeZoneKey) {
+            displayTimeZone = DisplayTimeZone(identifier: savedZone)
         }
 
         // Alerts are always enabled; macOS controls notification permission.
@@ -250,20 +271,30 @@ final class ClockModel: ObservableObject {
         return "\(seconds)s"
     }
 
-    /// Formats an absolute transition instant as a local time, e.g. "4:00 AM".
+    /// Formats an absolute transition instant in the selected display time zone,
+    /// e.g. "4:00 AM".
     ///
-    /// `timeZone = .autoupdatingCurrent` is the key line: it follows whatever time
-    /// zone the Mac is set to *right now*, without us ever hardcoding one. Built
-    /// once and reused because `DateFormatter` is comparatively expensive.
-    private static let transitionFormatter: DateFormatter = {
+    /// Built once and reused because `DateFormatter` is comparatively expensive;
+    /// only its `timeZone` changes when the user picks a different zone. The zone
+    /// follows the Mac by default (`DisplayTimeZone.system`).
+    private let transitionFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.timeZone = .autoupdatingCurrent
         formatter.dateStyle = .none
         formatter.timeStyle = .short
         return formatter
     }()
 
-    static func formatTransition(_ date: Date) -> String {
-        transitionFormatter.string(from: date)
+    private func transitionText(_ date: Date) -> String {
+        transitionFormatter.timeZone = displayTimeZone.timeZone
+        return transitionFormatter.string(from: date)
+    }
+
+    /// Pure helper for tests: formats `date` in `timeZone`.
+    static func formatTransition(_ date: Date, in timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }

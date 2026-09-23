@@ -49,16 +49,19 @@ final class DisplayTimeZoneTests: XCTestCase {
     }
 
     /// Grouping puts each zone under its region, sorted, with region-less zones
-    /// (UTC, GMT) under "Other".
+    /// under "Other".
     func testGroupingByRegion() {
+        let identifiers = DisplayTimeZone.selectableIdentifiers
         let groups = DisplayTimeZone.groupedIdentifiers()
         XCTAssertEqual(groups.map(\.region), groups.map(\.region).sorted())
 
-        let asia = groups.first { $0.region == "Asia" }
-        XCTAssertNotNil(asia)
-        XCTAssertTrue(asia!.identifiers.contains("Asia/Kolkata"))
-        XCTAssertTrue(asia!.identifiers.allSatisfy { $0.hasPrefix("Asia/") })
-
-        XCTAssertTrue(groups.contains { $0.region == "Other" && $0.identifiers.contains("UTC") })
+        XCTAssertEqual(groups.flatMap(\.identifiers).sorted(), identifiers)
+        for group in groups {
+            if group.region == "Other" {
+                XCTAssertTrue(group.identifiers.allSatisfy { !$0.contains("/") })
+            } else {
+                XCTAssertTrue(group.identifiers.allSatisfy { $0.hasPrefix("\(group.region)/") })
+            }
+        }
     }
 }

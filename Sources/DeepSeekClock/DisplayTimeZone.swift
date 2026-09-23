@@ -63,6 +63,20 @@ struct DisplayTimeZone: Equatable {
         TimeZone.knownTimeZoneIdentifiers.sorted()
     }
 
+    /// Zones grouped by their top-level region, e.g. "Asia" → ["Asia/Kolkata", …].
+    ///
+    /// The panel offers the choices as nested menus, and a flat list of ~400
+    /// identifiers would be unusable. The region is simply the part before the
+    /// first "/"; zones without one (UTC, GMT) land in "Other". Both the regions
+    /// and the identifiers inside them are sorted.
+    static func groupedIdentifiers() -> [(region: String, identifiers: [String])] {
+        Dictionary(grouping: selectableIdentifiers) { identifier in
+            identifier.split(separator: "/").first.map(String.init) ?? "Other"
+        }
+        .map { (region: $0.key, identifiers: $0.value.sorted()) }
+        .sorted { $0.region < $1.region }
+    }
+
     /// A readable label with the zone's current UTC offset, e.g.
     /// "Asia/Kolkata (GMT+5:30)".
     static func label(for zone: TimeZone) -> String {

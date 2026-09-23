@@ -30,12 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// The panel shown on click, hosting the SwiftUI `StatusView`.
     private let panel = StatusPanel()
-    private lazy var panelContent = NSHostingController(
-        rootView: StatusView(clock: clock, onOpenSettings: { [weak self] in self?.openSettings() })
-    )
-
-    /// Owns the standalone settings window, created on first use.
-    private lazy var settingsWindow = SettingsWindowController(clock: clock)
+    private lazy var panelContent = NSHostingController(rootView: StatusView(clock: clock))
     private var outsideClickMonitor: Any?
     private var localEventMonitor: Any?
 
@@ -45,6 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Last tooltip we set, so an unchanged string is not reassigned on every tick.
     private var lastPaintedTooltip: String?
+
+    /// Last settings-screen state we painted, so the panel is resized when (and
+    /// only when) the inline settings screen is shown or hidden.
+    private var lastShowingSettings = false
 
     // MARK: - Entry point
 
@@ -178,6 +177,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func paint() {
         guard let button = statusItem.button else { return }
 
+        // Showing or hiding the inline settings changes the panel's height. SwiftUI
+        // lays out asynchronously, so measure on the next run-loop pass.
+        if clock.isShowingSettings != lastShowingSettings {
+            lastShowingSettings = clock.isShowingSettings
+            DispatchQueue.main.async { [weak self] in self?.refitPanelIfVisible() }
+        }
+
         if clock.phase != lastPaintedPhase {
             button.image = StatusIcon.menuBarImage(for: clock.phase)
             lastPaintedPhase = clock.phase
@@ -193,13 +199,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         lastPaintedTooltip = tooltip
     }
 
-    // MARK: - Interaction
+    /// Resizes the visible panel to fit its current content, keeping it anchored
+    /// below the status item. Used when the inline settings screen changes height.
+    private func refitPanelIfVisible() {
+        guard panel.isVisible,
+              let button = statusItem.button,
+              let window = button.window else { return }
 
-    /// Opens the settings window from the gear button in the panel footer.
-    private func openSettings() {
-        closePanel()
-        settingsWindow.show()
+        let buttonFrame = window.convertToScreen(button.convert(button.bounds, to: nil))
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(
+            NSPoint(x: buttonFrame.midX, y: buttonFrame.midY)
+        ) }) ?? window.screen ?? NSScreen.main else { return }
+
+        let size = panelContent.sizeThatFits(in: NSSize(width: 292, height: screen.visibleFrame.height))
+        let frame = PanelPlacement.frame(size: size,
+                                         below: buttonFrame, screen: screen.visibleFrame)
+        guard frame != panel.frame else { return }
+        panel.setFrame(frame, display: true)
     }
+
+    // MARK: - Interaction
 
     /// Clicking the whale toggles the dropdown panel.
     @objc private func togglePanel() {
@@ -216,6 +235,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ) }) ?? window.screen ?? NSScreen.main else { return }
 
         clock.refresh()
+        // Always open on the main screen, not wherever the user left settings.
+        clock.isShowingSettings = false
         // Measure SwiftUI explicitly; fittingSize on an unshown hosting view can be zero.
         let size = panelContent.sizeThatFits(in: NSSize(width: 292, height: screen.visibleFrame.height))
         let frame = PanelPlacement.frame(size: size,

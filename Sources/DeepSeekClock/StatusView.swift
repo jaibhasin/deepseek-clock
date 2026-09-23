@@ -4,11 +4,6 @@ import AppKit
 /// Presentation only; pricing, timing, and model selection come from ClockModel.
 struct StatusView: View {
     @ObservedObject var clock: ClockModel
-
-    /// Opens the standalone settings window. Owned by the AppKit shell so this
-    /// view stays presentation-only.
-    var onOpenSettings: () -> Void = {}
-
     @Environment(\.colorScheme) private var colorScheme
 
     // Keep small status text legible on both light and dark surfaces.
@@ -28,8 +23,12 @@ struct StatusView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            hero
-            pricing
+            if clock.isShowingSettings {
+                SettingsView(clock: clock)
+            } else {
+                hero
+                pricing
+            }
             Divider()
             footer
         }
@@ -49,22 +48,40 @@ struct StatusView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 9) {
-            Image(nsImage: StatusIcon.image(for: clock.phase, size: 24))
-                .accessibilityHidden(true)
-            Text("DeepSeek Clock")
-                .font(.system(size: 14, weight: .semibold))
-            Spacer()
-            HStack(spacing: 5) {
-                Circle().fill(statusColor).frame(width: 5, height: 5)
-                Text(clock.phase == .offPeak ? "Off-peak" : "Peak")
-                    .font(.system(size: 11, weight: .semibold))
+    @ViewBuilder private var header: some View {
+        if clock.isShowingSettings {
+            HStack(spacing: 9) {
+                Button {
+                    clock.isShowingSettings = false
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .help("Back")
+
+                Text("Settings")
+                    .font(.system(size: 14, weight: .semibold))
+
+                Spacer()
             }
-            .foregroundStyle(statusColor)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(statusColor.opacity(0.1), in: Capsule())
+        } else {
+            HStack(spacing: 9) {
+                Image(nsImage: StatusIcon.image(for: clock.phase, size: 24))
+                    .accessibilityHidden(true)
+                Text("DeepSeek Clock")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                HStack(spacing: 5) {
+                    Circle().fill(statusColor).frame(width: 5, height: 5)
+                    Text(clock.phase == .offPeak ? "Off-peak" : "Peak")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(statusColor)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(statusColor.opacity(0.1), in: Capsule())
+            }
         }
     }
 
@@ -106,7 +123,7 @@ struct StatusView: View {
                 Text("Current rates")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("USD / 1M tokens")
+                Text("\(clock.displayPricing.currency.code) / 1M tokens")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -121,10 +138,10 @@ struct StatusView: View {
             .frame(maxWidth: .infinity)
 
             VStack(spacing: 10) {
-                priceRow("Input · cache hit", clock.currentPricing.inputCacheHit)
-                priceRow("Input · cache miss", clock.currentPricing.inputCacheMiss)
+                priceRow("Input · cache hit", clock.displayPricing.prices.inputCacheHit)
+                priceRow("Input · cache miss", clock.displayPricing.prices.inputCacheMiss)
                 Divider()
-                priceRow("Output", clock.currentPricing.output)
+                priceRow("Output", clock.displayPricing.prices.output)
             }
         }
         .padding(12)
@@ -140,7 +157,7 @@ struct StatusView: View {
             Text(label)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 8)
-            Text(USDPriceFormatter.string(value))
+            Text(CurrencyFormatter.string(value, currency: clock.displayPricing.currency))
                 .monospacedDigit()
                 .fontWeight(.semibold)
         }
@@ -161,12 +178,14 @@ struct StatusView: View {
 
             Spacer()
 
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
+            Button {
+                clock.isShowingSettings.toggle()
+            } label: {
+                Image(systemName: clock.isShowingSettings ? "gearshape.fill" : "gearshape")
                     .font(.system(size: 12, weight: .medium))
             }
-            .help("Settings")
-            .accessibilityLabel("Settings")
+            .help(clock.isShowingSettings ? "Close settings" : "Settings")
+            .accessibilityLabel(clock.isShowingSettings ? "Close settings" : "Settings")
 
             Button("Quit") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")

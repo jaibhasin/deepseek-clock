@@ -27,7 +27,14 @@ struct StatusView: View {
                 SettingsView(clock: clock)
             } else {
                 hero
-                pricing
+                VStack(alignment: .leading, spacing: 6) {
+                    pricing
+                    Text("Reasoning mode affects token usage, not the rates")
+                        .font(.system(size: 10))
+                        .italic()
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 3)
+                }
             }
             Divider()
             footer

@@ -83,6 +83,33 @@ final class ClockModelTests: XCTestCase {
         XCTAssertEqual(notifications.authorizationRequests, 1)
     }
 
+    func testMenuBarIconSelectionPersistsAcrossModels() {
+        let defaults = UserDefaults.standard
+        let iconKey = "selectedMenuBarIconStyle"
+        let currencyKey = "selectedCurrencyCode"
+        let previousIcon = defaults.object(forKey: iconKey)
+        let previousCurrency = defaults.object(forKey: currencyKey)
+        defer {
+            if let previousIcon { defaults.set(previousIcon, forKey: iconKey) }
+            else { defaults.removeObject(forKey: iconKey) }
+            if let previousCurrency { defaults.set(previousCurrency, forKey: currencyKey) }
+            else { defaults.removeObject(forKey: currencyKey) }
+        }
+        defaults.removeObject(forKey: iconKey)
+        defaults.set("USD", forKey: currencyKey)
+
+        let first = ClockModel(notifications: NotificationSpy())
+        defer { first.pauseTicking() }
+        XCTAssertEqual(first.selectedIconStyle, .spoutWhale)
+
+        first.selectedIconStyle = .hourglass
+        XCTAssertEqual(defaults.string(forKey: iconKey), "hourglass")
+
+        let restored = ClockModel(notifications: NotificationSpy())
+        defer { restored.pauseTicking() }
+        XCTAssertEqual(restored.selectedIconStyle, .hourglass)
+    }
+
     // MARK: - Adaptive refresh cadence
 
     /// With the panel open the countdown is read live, so under an hour remaining

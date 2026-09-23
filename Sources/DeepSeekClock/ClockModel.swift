@@ -86,6 +86,15 @@ final class ClockModel: ObservableObject {
         }
     }
 
+    /// Menu bar artwork, saved so the same icon returns on the next launch.
+    @Published var selectedIconStyle: MenuBarIconStyle = .spoutWhale {
+        didSet {
+            guard selectedIconStyle != oldValue else { return }
+            UserDefaults.standard.set(selectedIconStyle.rawValue, forKey: Self.selectedIconStyleKey)
+            onUpdate?()
+        }
+    }
+
     /// The latest known USD exchange rates, from cache or the network.
     @Published private(set) var exchangeRates: ExchangeRates?
 
@@ -129,6 +138,9 @@ final class ClockModel: ObservableObject {
 
     /// `UserDefaults` key for the chosen currency code. Absent = USD.
     private static let selectedCurrencyKey = "selectedCurrencyCode"
+
+    /// `UserDefaults` key for the menu bar icon. Absent = current spout whale.
+    private static let selectedIconStyleKey = "selectedMenuBarIconStyle"
 
     /// The rule engine. Stateless, so one instance is enough for the whole app.
     private let schedule = DeepSeekSchedule()
@@ -186,6 +198,10 @@ final class ClockModel: ObservableObject {
         // Restore the chosen currency and the last cached exchange rates.
         if let savedCurrency = UserDefaults.standard.string(forKey: Self.selectedCurrencyKey) {
             selectedCurrency = Currency(code: savedCurrency)
+        }
+        if let savedIcon = UserDefaults.standard.string(forKey: Self.selectedIconStyleKey),
+           let style = MenuBarIconStyle(rawValue: savedIcon) {
+            selectedIconStyle = style
         }
         exchangeRates = rateStore.load()
 

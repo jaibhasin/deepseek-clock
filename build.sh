@@ -34,6 +34,7 @@ mkdir -p "${BUNDLE}/Contents/Resources"
 cp ".build/release/${APP_NAME}" "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "Resources/Info.plist" "${BUNDLE}/Contents/Info.plist"
 cp "Resources/AppIcon.icns" "${BUNDLE}/Contents/Resources/AppIcon.icns"
+cp "Sources/DeepSeekClock/Resources/DeepSeekWhale.pdf" "${BUNDLE}/Contents/Resources/"
 
 # 4. Ad-hoc signature ("-") is enough for a locally-built app on the same Mac.
 codesign --force --sign - "${BUNDLE}" >/dev/null 2>&1 || true

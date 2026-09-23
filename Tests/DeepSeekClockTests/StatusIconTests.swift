@@ -4,21 +4,31 @@ import XCTest
 
 final class StatusIconTests: XCTestCase {
     @MainActor
-    func testMenuBarKeepsTemplateWhaleAndDistinctPhaseColours() {
-        let whale = StatusIcon.menuBarImage()
-        let offPeakSpout = StatusIcon.spoutImage(for: .offPeak)
-        let peakSpout = StatusIcon.spoutImage(for: .peak)
+    func testAllEightIconsKeepNativeTemplateContrastAndPhaseColour() {
+        XCTAssertEqual(MenuBarIconStyle.allCases.count, 8)
+        XCTAssertTrue(StatusIcon.hasOfficialArtwork)
 
-        XCTAssertTrue(whale.isTemplate)
-        XCTAssertFalse(offPeakSpout.isTemplate)
-        XCTAssertFalse(peakSpout.isTemplate)
-        XCTAssertEqual(whale.size, offPeakSpout.size)
-        XCTAssertEqual(whale.size, peakSpout.size)
+        for style in MenuBarIconStyle.allCases {
+            let shape = StatusIcon.menuBarImage(for: style)
+            let offPeak = StatusIcon.accentImage(for: style, phase: .offPeak)
+            let peak = StatusIcon.accentImage(for: style, phase: .peak)
 
-        let offPeakPixels = offPeakSpout.tiffRepresentation
-        let peakPixels = peakSpout.tiffRepresentation
-        XCTAssertNotNil(offPeakPixels)
-        XCTAssertNotNil(peakPixels)
-        XCTAssertNotEqual(offPeakPixels, peakPixels)
+            XCTAssertTrue(shape.isTemplate, style.displayName)
+            XCTAssertEqual(shape.size, NSSize(width: 18, height: 18))
+            if style.showsPricingColor {
+                guard let offPeak, let peak else {
+                    XCTFail("Missing accent for \(style.displayName)")
+                    continue
+                }
+                XCTAssertFalse(offPeak.isTemplate)
+                XCTAssertFalse(peak.isTemplate)
+                XCTAssertEqual(offPeak.size, shape.size)
+                XCTAssertNotEqual(offPeak.tiffRepresentation, peak.tiffRepresentation,
+                                  style.displayName)
+            } else {
+                XCTAssertNil(offPeak, style.displayName)
+                XCTAssertNil(peak, style.displayName)
+            }
+        }
     }
 }

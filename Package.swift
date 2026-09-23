@@ -42,7 +42,8 @@ let package = Package(
         // `path` points at the folder that contains our .swift source files.
         .executableTarget(
             name: "DeepSeekClock",
-            path: "Sources/DeepSeekClock"
+            path: "Sources/DeepSeekClock",
+            resources: [.process("Resources/DeepSeekWhale.pdf")]
         ),
 
         // Unit tests for the pure business logic (schedule + pricing). SwiftPM

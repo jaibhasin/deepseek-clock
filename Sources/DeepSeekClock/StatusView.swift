@@ -30,13 +30,14 @@ struct StatusView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     pricing
                     Text("Reasoning mode affects token usage, not the rates")
-                        .font(.system(size: 10))
+                        .font(.system(size: 9.5))
                         .italic()
                         .foregroundStyle(.secondary)
                         .padding(.leading, 3)
                 }
             }
             Divider()
+                .padding(.top, clock.isShowingSettings ? 0 : -6)
             footer
         }
         .padding(16)

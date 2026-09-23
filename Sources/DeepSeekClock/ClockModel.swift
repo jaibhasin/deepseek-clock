@@ -82,6 +82,7 @@ final class ClockModel: ObservableObject {
             guard selectedCurrency != oldValue else { return }
             UserDefaults.standard.set(selectedCurrency.code, forKey: Self.selectedCurrencyKey)
             refreshRatesIfNeeded()
+            onUpdate?()
         }
     }
 
@@ -331,6 +332,7 @@ final class ClockModel: ObservableObject {
         guard !isRefreshingRates else { return }
         isRefreshingRates = true
         didFailRates = false
+        onUpdate?()
 
         let service = rateService
         let store = rateStore
@@ -343,11 +345,13 @@ final class ClockModel: ObservableObject {
                     store.save(rates)
                     self.isRefreshingRates = false
                     self.didFailRates = false
+                    self.onUpdate?()
                 }
             } catch {
                 await MainActor.run {
                     self.isRefreshingRates = false
                     self.didFailRates = true
+                    self.onUpdate?()
                 }
             }
         }

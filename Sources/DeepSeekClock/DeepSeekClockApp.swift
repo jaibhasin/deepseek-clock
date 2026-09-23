@@ -41,10 +41,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Last tooltip we set, so an unchanged string is not reassigned on every tick.
     private var lastPaintedTooltip: String?
 
-    /// Last settings-screen state we painted, so the panel is resized when (and
-    /// only when) the inline settings screen is shown or hidden.
-    private var lastShowingSettings = false
-
     // MARK: - Entry point
 
     /// We are an accessory app: no Dock icon and no app switcher entry, which is
@@ -177,10 +173,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func paint() {
         guard let button = statusItem.button else { return }
 
-        // Showing or hiding the inline settings changes the panel's height. SwiftUI
-        // lays out asynchronously, so measure on the next run-loop pass.
-        if clock.isShowingSettings != lastShowingSettings {
-            lastShowingSettings = clock.isShowingSettings
+        // The panel's content can change height (inline settings, a currency
+        // status line appearing). SwiftUI lays out asynchronously, so re-measure on
+        // the next run-loop pass; `refitPanelIfVisible` only resizes when it needs to.
+        if panel.isVisible {
             DispatchQueue.main.async { [weak self] in self?.refitPanelIfVisible() }
         }
 

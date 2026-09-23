@@ -20,7 +20,7 @@ and sits below it in a smaller, muted style.
 ## Pricing display
 
 DeepSeek bills per 1M tokens, so there is no single fixed "price per request".
-The dropdown shows the published rate card in USD per 1M tokens:
+The dropdown shows the published rate card per 1M tokens:
 
 - input (cache hit)
 - input (cache miss)
@@ -30,21 +30,51 @@ A segmented toggle switches between `deepseek-flash` and `deepseek-v4-pro`;
 the chosen model is remembered across launches. Rates shown already reflect the
 current phase (peak or half-price off-peak).
 
+Prices are published by DeepSeek in USD. When the user picks another currency,
+the USD amounts are converted with live exchange rates (see below) and the
+header shows the currency in use (e.g. `INR / 1M tokens`).
+
+## Settings
+
+The settings screen is shown **inline inside the panel**, not in a separate
+window: the gear in the footer swaps the panel content, and a back arrow returns
+to the main view. Settings are intentionally compact — one short row per
+preference, each with a native menu:
+
+- **Time zone** — which clock transition times are shown in
+- **Currency** — which currency prices are converted into
+
 ## Actions
 
 A compact footer offers three standard macOS buttons: **DeepSeek Console** (opens
 the DeepSeek platform console in the default browser), a **Settings** gear
-(opens the settings window), and **Quit**.
+(toggles the inline settings screen), and **Quit**.
 
 ## Time zone
 
-By default the app shows transition times in the Mac's system time zone. A
-**Settings** window lets the user display them in any time zone instead, so they
-can follow another country's clock. The choice is remembered across launches.
+By default the app shows transition times in the Mac's system time zone. The
+**Time zone** setting lets the user display them in any other time zone instead,
+so they can follow another country's clock. The choice is remembered across
+launches.
 
 DeepSeek's peak/off-peak schedule is always defined in UTC, so changing the
 display time zone never changes *whether* pricing is peak or off-peak — only the
 wall-clock time shown for the next transition.
+
+## Currency
+
+Prices are shown in **USD** by default. The **Currency** setting lists the
+currencies the system knows about and converts the USD rate card into the chosen
+one.
+
+Conversion uses live daily exchange rates from the free, key-less
+`open.er-api.com` endpoint (USD-based). The app:
+
+- fetches rates only when a non-USD currency is selected, and only when the
+  cached snapshot is missing or more than 12 hours old;
+- caches the last good snapshot on disk so prices still render offline;
+- shows the current rate and when it was last updated, with a manual refresh;
+- falls back to USD (and says so) if no rate is available.
 
 ## Notifications
 
@@ -92,7 +122,8 @@ agent (`LSUIElement`), so it never shows a Dock icon or an app-switcher entry.
 
 - Extremely lightweight
 - Native macOS experience
-- No backend
-- No account required
-- No unnecessary network requests
+- No backend and no account
+- No network requests unless needed: the only request the app can make is the
+  exchange-rate fetch, and only when a non-USD currency is selected and the
+  cached rates are stale
 - Pricing calculation should happen locally

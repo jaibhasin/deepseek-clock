@@ -75,10 +75,49 @@ final class ClockModel: ObservableObject {
         }
     }
 
+    /// Currency prices are shown in, persisted on change. Picking a non-USD
+    /// currency lazily triggers a rate refresh.
+    @Published var selectedCurrency: Currency = .usd {
+        didSet {
+            guard selectedCurrency != oldValue else { return }
+            UserDefaults.standard.set(selectedCurrency.code, forKey: Self.selectedCurrencyKey)
+            refreshRatesIfNeeded()
+        }
+    }
+
+    /// The latest known USD exchange rates, from cache or the network.
+    @Published private(set) var exchangeRates: ExchangeRates?
+
+    /// `true` while a rate refresh is in flight.
+    @Published private(set) var isRefreshingRates = false
+
+    /// `true` when the most recent refresh failed. The UI keeps showing the last
+    /// good snapshot and offers a retry.
+    @Published private(set) var didFailRates = false
+
     /// Current rates for the selected model, already resolved to the live phase.
     /// The view reads this; it is derived, never stored.
     var currentPricing: ModelPricing {
         DeepSeekPricing.pricing(for: selectedModel, phase: phase)
+    }
+
+    /// `currentPricing` converted into `selectedCurrency`, ready to display.
+    var displayPricing: DisplayPricing {
+        CurrencyConverter.display(currentPricing,
+                                  currency: selectedCurrency,
+                                  rates: exchangeRates)
+    }
+
+    /// `true` while the panel is showing its inline settings screen.
+    ///
+    /// This is UI state, but it lives here (next to `isPanelOpen`) so the AppKit
+    /// shell can reset it when the panel opens and resize the panel when the
+    /// content changes. It is never persisted.
+    @Published var isShowingSettings = false {
+        didSet {
+            guard isShowingSettings != oldValue else { return }
+            onUpdate?()
+        }
     }
 
     /// `UserDefaults` key for the selected model.
@@ -87,11 +126,20 @@ final class ClockModel: ObservableObject {
     /// `UserDefaults` key for the chosen display time zone. Absent = system zone.
     private static let displayTimeZoneKey = "displayTimeZoneIdentifier"
 
+    /// `UserDefaults` key for the chosen currency code. Absent = USD.
+    private static let selectedCurrencyKey = "selectedCurrencyCode"
+
     /// The rule engine. Stateless, so one instance is enough for the whole app.
     private let schedule = DeepSeekSchedule()
 
     /// Delivers the off-peak alert. Injected so tests can swap in a spy.
     private let notifications: NotificationService
+
+    /// Fetches exchange rates. Injected so tests never touch the network.
+    private let rateService: ExchangeRateService
+
+    /// Caches the last good rates so the app still works offline.
+    private let rateStore: ExchangeRateStore
 
     /// The phase we saw on the previous tick, or `nil` before the first tick.
     /// Comparing it against the freshly computed phase is what lets us fire the
@@ -114,8 +162,12 @@ final class ClockModel: ObservableObject {
     /// still imports nothing but Foundation and stays easy to test.
     var onUpdate: (() -> Void)?
 
-    init(notifications: NotificationService = UserNotificationService()) {
+    init(notifications: NotificationService = UserNotificationService(),
+         rateService: ExchangeRateService = LiveExchangeRateService(),
+         rateStore: ExchangeRateStore = ExchangeRateStore()) {
         self.notifications = notifications
+        self.rateService = rateService
+        self.rateStore = rateStore
 
         // Restore the model the user last picked, if any. Assigning here does not
         // trigger the `didSet` observer (property observers are skipped during
@@ -130,11 +182,20 @@ final class ClockModel: ObservableObject {
             displayTimeZone = DisplayTimeZone(identifier: savedZone)
         }
 
+        // Restore the chosen currency and the last cached exchange rates.
+        if let savedCurrency = UserDefaults.standard.string(forKey: Self.selectedCurrencyKey) {
+            selectedCurrency = Currency(code: savedCurrency)
+        }
+        exchangeRates = rateStore.load()
+
         // Alerts are always enabled; macOS controls notification permission.
         notifications.requestAuthorization()
 
         // Show correct values immediately; `refresh()` also arms the timer.
         refresh()
+
+        // Fetch rates only if a non-USD currency actually needs them.
+        refreshRatesIfNeeded()
     }
 
     deinit {
@@ -251,6 +312,45 @@ final class ClockModel: ObservableObject {
         to current: PricingPhase
     ) -> Bool {
         previous == .peak && current == .offPeak
+    }
+
+    // MARK: - Exchange rates
+
+    /// Fetches rates only when they are actually needed: a non-USD currency is
+    /// selected and the cached snapshot is missing or old. While the user stays on
+    /// USD the app makes no network request at all.
+    func refreshRatesIfNeeded() {
+        guard !selectedCurrency.isBase else { return }
+        if let rates = exchangeRates, !rates.isStale(now: Date()) { return }
+        refreshRates()
+    }
+
+    /// Forces a rate refresh, ignoring the cache. Safe to call repeatedly; an
+    /// in-flight refresh suppresses duplicates.
+    func refreshRates() {
+        guard !isRefreshingRates else { return }
+        isRefreshingRates = true
+        didFailRates = false
+
+        let service = rateService
+        let store = rateStore
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let rates = try await service.fetchLatest()
+                await MainActor.run {
+                    self.exchangeRates = rates
+                    store.save(rates)
+                    self.isRefreshingRates = false
+                    self.didFailRates = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isRefreshingRates = false
+                    self.didFailRates = true
+                }
+            }
+        }
     }
 
     // MARK: - Formatting

@@ -102,7 +102,10 @@ final class ClockModelTests: XCTestCase {
         defer { first.pauseTicking() }
         XCTAssertEqual(first.selectedIconStyle, .spoutWhale)
 
+        var updates = 0
+        first.onUpdate = { updates += 1 }
         first.selectedIconStyle = .hourglass
+        XCTAssertEqual(updates, 1)
         XCTAssertEqual(defaults.string(forKey: iconKey), "hourglass")
 
         let restored = ClockModel(notifications: NotificationSpy())

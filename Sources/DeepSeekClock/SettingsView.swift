@@ -5,8 +5,9 @@
 //  ┌──────────────────────────────── PURPOSE ─────────────────────────────────────┐
 //  │ The inline settings screen shown inside the dropdown panel.                  │
 //  │                                                                              │
-//  │ It is deliberately compact: one short row per preference, each with a         │
-//  │ native menu for changing it. Two preferences exist today:                     │
+//  │ It is deliberately compact: a scrollable icon picker and short rows for       │
+//  │ the other preferences.                                                        │
+//  │     • Menu bar icon - the artwork shown above the panel                        │
 //  │     • Time zone — which clock transition times are shown in                   │
 //  │     • Currency  — which currency prices are converted into                    │
 //  │                                                                              │
@@ -21,6 +22,8 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            iconPicker
+
             settingRow(title: "Time zone",
                        value: clock.displayTimeZone.displayName) {
                 timeZoneMenuItems
@@ -43,6 +46,80 @@ struct SettingsView: View {
                     .padding(.leading, 10)
             }
         }
+    }
+
+    // MARK: - Menu bar icon
+
+    private var iconPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Menu bar icon")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(clock.selectedIconStyle.displayName)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        ForEach(MenuBarIconStyle.allCases) { style in
+                            iconOption(style).id(style)
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                    .padding(.vertical, 1)
+                }
+                .onAppear {
+                    proxy.scrollTo(clock.selectedIconStyle, anchor: .center)
+                }
+            }
+        }
+        .padding(10)
+        .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.primary.opacity(0.06), lineWidth: 0.5)
+        }
+    }
+
+    private func iconOption(_ style: MenuBarIconStyle) -> some View {
+        let isSelected = clock.selectedIconStyle == style
+        return Button {
+            clock.selectedIconStyle = style
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Image(nsImage: StatusIcon.menuBarImage(for: style, size: 28))
+                        .renderingMode(.template)
+                        .foregroundStyle(.primary)
+                    if let accent = StatusIcon.accentImage(for: style,
+                                                            phase: clock.phase, size: 28) {
+                        Image(nsImage: accent)
+                            .renderingMode(.original)
+                    }
+                }
+                .frame(width: 28, height: 28)
+
+                Text(style.shortName)
+                    .font(.system(size: 9, weight: isSelected ? .semibold : .medium))
+                    .lineLimit(1)
+            }
+            .frame(width: 59, height: 52)
+            .background(isSelected ? Color.accentColor.opacity(0.14) : .primary.opacity(0.035),
+                        in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.7) : .primary.opacity(0.06),
+                                  lineWidth: isSelected ? 1 : 0.5)
+            }
+        }
+        .buttonStyle(.plain)
+        .help(style.displayName)
+        .accessibilityLabel(style.displayName)
+        .accessibilityValue(isSelected ? "Selected" : "")
     }
 
     // MARK: - Time zone

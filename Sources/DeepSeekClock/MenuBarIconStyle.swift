@@ -25,6 +25,19 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
         }
     }
 
+    var shortName: String {
+        switch self {
+        case .plainWhale: return "Plain"
+        case .spoutWhale: return "Spout"
+        case .boldWhale: return "Bold"
+        case .deepSeekPlain: return "DeepSeek"
+        case .deepSeekTwoTone: return "Two-tone"
+        case .tailSplash: return "Tail"
+        case .oceanWave: return "Wave"
+        case .hourglass: return "Hourglass"
+        }
+    }
+
     var showsPricingColor: Bool {
         self != .plainWhale && self != .deepSeekPlain
     }

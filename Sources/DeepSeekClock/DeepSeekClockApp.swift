@@ -9,8 +9,8 @@
 //  │ WHY APPKIT INSTEAD OF SWIFTUI'S `MenuBarExtra`?                              │
 //  │ A hand-rolled `NSStatusItem` gives us direct control over the button's       │
 //  │ image and a live, per-second tooltip, which is all this little shell needs.  │
-//  │ The whale uses native template rendering for contrast, with a coloured      │
-//  │ spout overlaid to show the current pricing phase.                            │
+//  │ The selected icon uses native template rendering for contrast, with a       │
+//  │ separate coloured detail when the design shows pricing phase.               │
 //  │                                                                              │
 //  │ The dropdown itself is still 100% SwiftUI (`StatusView`) hosted inside an    │
 //  │ `NSPanel` - AppKit handles positioning and keyboard focus.              │
@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// The menu bar item itself.
     private var statusItem: NSStatusItem!
-    private let spoutView = StatusSpoutView()
+    private let accentView = StatusAccentView()
 
     /// The panel shown on click, hosting the SwiftUI `StatusView`.
     private let panel = StatusPanel()
@@ -35,7 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var outsideClickMonitor: Any?
     private var localEventMonitor: Any?
 
-    /// Last phase we drew, so we only update the coloured spout when it changes.
+    /// Last icon style and phase drawn, so idle ticks do not rebuild artwork.
+    private var lastPaintedIconStyle: MenuBarIconStyle?
     private var lastPaintedPhase: PricingPhase?
 
     /// Last tooltip we set, so an unchanged string is not reassigned on every tick.
@@ -77,18 +78,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let button = statusItem.button else { return }
         button.target = self
         button.action = #selector(togglePanel)
-        button.image = StatusIcon.menuBarImage()
+        button.image = StatusIcon.menuBarImage(for: clock.selectedIconStyle)
         button.imagePosition = .imageOnly
 
-        spoutView.image = StatusIcon.spoutImage(for: clock.phase)
-        spoutView.imageScaling = .scaleNone
-        spoutView.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(spoutView)
+        accentView.image = StatusIcon.accentImage(for: clock.selectedIconStyle, phase: clock.phase)
+        accentView.imageScaling = .scaleNone
+        accentView.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(accentView)
         NSLayoutConstraint.activate([
-            spoutView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
-            spoutView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-            spoutView.widthAnchor.constraint(equalToConstant: 18),
-            spoutView.heightAnchor.constraint(equalToConstant: 18)
+            accentView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+            accentView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            accentView.widthAnchor.constraint(equalToConstant: 18),
+            accentView.heightAnchor.constraint(equalToConstant: 18)
         ])
     }
 
@@ -180,8 +181,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Pushes the current phase/countdown into the status item.
     ///
-    /// The spout is updated only when the phase changes. The tooltip is likewise
-    /// only rewritten when its text changes.
+    /// Artwork is updated only when the icon choice or phase changes. The tooltip
+    /// is likewise only rewritten when its text changes.
     private func paint() {
         guard let button = statusItem.button else { return }
 
@@ -192,8 +193,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             DispatchQueue.main.async { [weak self] in self?.refitPanelIfVisible() }
         }
 
-        if clock.phase != lastPaintedPhase {
-            spoutView.image = StatusIcon.spoutImage(for: clock.phase)
+        let styleChanged = clock.selectedIconStyle != lastPaintedIconStyle
+        if styleChanged {
+            button.image = StatusIcon.menuBarImage(for: clock.selectedIconStyle)
+            lastPaintedIconStyle = clock.selectedIconStyle
+        }
+        if styleChanged || clock.phase != lastPaintedPhase {
+            accentView.image = StatusIcon.accentImage(for: clock.selectedIconStyle,
+                                                      phase: clock.phase)
             lastPaintedPhase = clock.phase
         }
 
@@ -258,7 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 }
 
-/// Let clicks on the coloured spout reach the status button underneath it.
-private final class StatusSpoutView: NSImageView {
+/// Let clicks on the coloured detail reach the status button underneath it.
+private final class StatusAccentView: NSImageView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

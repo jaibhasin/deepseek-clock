@@ -40,6 +40,13 @@ struct Currency: Identifiable, Hashable {
         return [usd] + codes.map(Currency.init)
     }
 
+    /// A short list for the top of the picker so the common choices do not require
+    /// scrolling through all ~150 currencies. Order is by rough popularity.
+    static let common: [Currency] = [
+        "USD", "EUR", "GBP", "INR", "CNY", "JPY", "AUD", "CAD",
+        "CHF", "HKD", "SGD", "NZD", "KRW", "BRL", "MXN", "ZAR", "SEK", "AED"
+    ].map(Currency.init)
+
     /// `true` when this is the base currency (no conversion needed).
     var isBase: Bool { code == Self.usd.code }
 

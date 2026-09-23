@@ -60,9 +60,17 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var currencyMenuItems: some View {
-        ForEach(Currency.selectable) { currency in
+        ForEach(Currency.common) { currency in
             Button("\(currency.code) · \(currency.name)") {
                 clock.selectedCurrency = currency
+            }
+        }
+        Divider()
+        Menu("All currencies") {
+            ForEach(Currency.selectable) { currency in
+                Button("\(currency.code) · \(currency.name)") {
+                    clock.selectedCurrency = currency
+                }
             }
         }
     }

@@ -21,6 +21,20 @@ final class CurrencyTests: XCTestCase {
         ExchangeRates(baseCode: "USD", rates: values, updatedAt: updated)
     }
 
+    // MARK: - Selection lists
+
+    /// USD leads the full list, and every "common" shortcut exists in the full list.
+    func testCurrencyLists() {
+        XCTAssertEqual(Currency.selectable.first, .usd)
+        let rest = Currency.selectable.dropFirst().map(\.code)
+        XCTAssertEqual(rest, rest.sorted())
+
+        let allCodes = Set(Currency.selectable.map(\.code))
+        XCTAssertFalse(Currency.common.isEmpty)
+        XCTAssertTrue(Currency.common.allSatisfy { allCodes.contains($0.code) })
+        XCTAssertTrue(Currency.common.contains(.usd))
+    }
+
     // MARK: - Conversion
 
     /// USD needs no rate at all and must be returned untouched.

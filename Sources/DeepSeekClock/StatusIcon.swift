@@ -12,8 +12,8 @@
 //  │ rectangle it is handed, so it scales cleanly from the 18pt menu bar glyph to  │
 //  │ the 26pt popover header.                                                      │
 //  │                                                                              │
-//  │ The menu bar uses a template version so macOS can maintain contrast against   │
-//  │ any wallpaper. The panel version keeps the red/green phase-coloured spout.     │
+//  │ The menu bar uses a template whale for contrast and a separate coloured       │
+//  │ spout. The panel draws both parts in one image.                                │
 //  │                                                                              │
 //  │ HOW THE WHALE IS ASSEMBLED                                                   │
 //  │ The body, tail fluke and pectoral fin overlap and share one colour, so they   │
@@ -56,12 +56,30 @@ enum StatusIcon {
         return image
     }
 
-    /// A native template variant for the menu bar. macOS chooses its foreground
-    /// from the wallpaper behind the menu bar, which can differ from light/dark
-    /// mode. Template rendering is the only reliable way to follow that contrast.
-    static func menuBarImage(for phase: PricingPhase, size: CGFloat = 18) -> NSImage {
-        let image = image(for: phase, size: size)
+    /// Keep the whale body native to the menu bar. A template image would erase
+    /// the spout's colour, so the spout is drawn in a separate overlay.
+    static func menuBarImage(size: CGFloat = 18) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            let box = rect.insetBy(dx: rect.width * 0.04, dy: rect.height * 0.04)
+            NSColor.black.setFill()
+            body(in: box).fill()
+            tail(in: box).fill()
+            fin(in: box).fill()
+            return true
+        }
         image.isTemplate = true
+        return image
+    }
+
+    /// Transparent overlay aligned with the menu bar whale's 18pt image.
+    static func spoutImage(for phase: PricingPhase, size: CGFloat = 18) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            let box = rect.insetBy(dx: rect.width * 0.04, dy: rect.height * 0.04)
+            phase.nsColor.setFill()
+            spout(in: box).fill()
+            return true
+        }
+        image.isTemplate = false
         return image
     }
 

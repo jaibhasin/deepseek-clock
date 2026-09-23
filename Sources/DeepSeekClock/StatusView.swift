@@ -6,6 +6,21 @@ struct StatusView: View {
     @ObservedObject var clock: ClockModel
     @Environment(\.colorScheme) private var colorScheme
 
+    private var headerIcon: some View {
+        ZStack {
+            Image(nsImage: StatusIcon.menuBarImage(for: clock.selectedIconStyle, size: 24))
+                .renderingMode(.template)
+                .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
+            if let accent = StatusIcon.accentImage(for: clock.selectedIconStyle,
+                                                    phase: clock.phase, size: 24) {
+                Image(nsImage: accent)
+                    .renderingMode(.original)
+            }
+        }
+        .frame(width: 24, height: 24)
+        .accessibilityHidden(true)
+    }
+
     // Keep small status text legible on both light and dark surfaces.
     private var statusColor: Color {
         switch clock.phase {
@@ -75,8 +90,7 @@ struct StatusView: View {
             }
         } else {
             HStack(spacing: 9) {
-                Image(nsImage: StatusIcon.image(for: clock.phase, size: 24))
-                    .accessibilityHidden(true)
+                headerIcon
                 Text("DeepSeek Clock")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()

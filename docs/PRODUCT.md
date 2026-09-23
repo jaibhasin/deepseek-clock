@@ -32,8 +32,19 @@ current phase (peak or half-price off-peak).
 
 ## Actions
 
-A compact footer offers two standard macOS buttons: **DeepSeek Console** (opens
-the DeepSeek platform console in the default browser) and **Quit**.
+A compact footer offers three standard macOS buttons: **DeepSeek Console** (opens
+the DeepSeek platform console in the default browser), a **Settings** gear
+(opens the settings window), and **Quit**.
+
+## Time zone
+
+By default the app shows transition times in the Mac's system time zone. A
+**Settings** window lets the user display them in any time zone instead, so they
+can follow another country's clock. The choice is remembered across launches.
+
+DeepSeek's peak/off-peak schedule is always defined in UTC, so changing the
+display time zone never changes *whether* pricing is peak or off-peak — only the
+wall-clock time shown for the next transition.
 
 ## Notifications
 

@@ -47,4 +47,18 @@ final class DisplayTimeZoneTests: XCTestCase {
         XCTAssertEqual(identifiers, identifiers.sorted())
         XCTAssertTrue(identifiers.contains("Asia/Kolkata"))
     }
+
+    /// Grouping puts each zone under its region, sorted, with region-less zones
+    /// (UTC, GMT) under "Other".
+    func testGroupingByRegion() {
+        let groups = DisplayTimeZone.groupedIdentifiers()
+        XCTAssertEqual(groups.map(\.region), groups.map(\.region).sorted())
+
+        let asia = groups.first { $0.region == "Asia" }
+        XCTAssertNotNil(asia)
+        XCTAssertTrue(asia!.identifiers.contains("Asia/Kolkata"))
+        XCTAssertTrue(asia!.identifiers.allSatisfy { $0.hasPrefix("Asia/") })
+
+        XCTAssertTrue(groups.contains { $0.region == "Other" && $0.identifiers.contains("UTC") })
+    }
 }

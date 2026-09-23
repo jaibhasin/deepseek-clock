@@ -6,8 +6,8 @@
 //  │ Remembers the last good `ExchangeRates` snapshot on disk.                    │
 //  │                                                                              │
 //  │ Why cache at all? It keeps the app useful without a network connection and    │
-//  │ avoids a request on every launch — we only refetch once the snapshot is a     │
-//  │ day old.                                                                     │
+//  │ avoids a request on every launch - we only refetch once the snapshot is 12   │
+//  │ hours old.                                                                   │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 import Foundation

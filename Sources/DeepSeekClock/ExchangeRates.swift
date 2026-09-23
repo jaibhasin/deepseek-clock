@@ -11,12 +11,12 @@
 //  │ stub and never hit the network.                                              │
 //  │                                                                              │
 //  │ The snapshot is cached on disk (`ExchangeRateStore`) so the app still shows   │
-//  │ sensible prices offline and only refetches when the data is a day old.        │
+//  │ sensible prices offline and only refetches when the data is 12 hours old.     │
 //  └──────────────────────────────────────────────────────────────────────────────┘
 //
 //  DATA SOURCE
 //  -----------
-//  https://www.exchangerate-api.com/ — the free, key-less "open access" endpoint
+//  https://www.exchangerate-api.com/ - the free, key-less "open access" endpoint
 //      GET https://open.er-api.com/v6/latest/USD
 //
 //  It returns a JSON object whose `rates` map is "units of currency per 1 USD".

@@ -34,19 +34,35 @@ struct SettingsView: View {
             if let status = rateStatus {
                 rateStatusRow(status)
             }
+
+            if !clock.selectedCurrency.isBase {
+                Link("Rates by ExchangeRate-API",
+                     destination: URL(string: "https://www.exchangerate-api.com/")!)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 10)
+            }
         }
     }
 
     // MARK: - Time zone
 
     @ViewBuilder private var timeZoneMenuItems: some View {
-        Button("System") { clock.displayTimeZone = .system }
+        Button {
+            clock.displayTimeZone = .system
+        } label: {
+            choiceLabel("System", isSelected: clock.displayTimeZone.isSystem)
+        }
         Divider()
         ForEach(DisplayTimeZone.groupedIdentifiers(), id: \.region) { group in
             Menu(group.region) {
                 ForEach(group.identifiers, id: \.self) { identifier in
-                    Button(identifier.replacingOccurrences(of: "_", with: " ")) {
+                    Button {
                         clock.displayTimeZone = DisplayTimeZone(identifier: identifier)
+                    } label: {
+                        let title = TimeZone(identifier: identifier)
+                            .map(DisplayTimeZone.label(for:)) ?? identifier
+                        choiceLabel(title, isSelected: clock.displayTimeZone.identifier == identifier)
                     }
                 }
             }
@@ -61,15 +77,21 @@ struct SettingsView: View {
 
     @ViewBuilder private var currencyMenuItems: some View {
         ForEach(Currency.common) { currency in
-            Button("\(currency.code) · \(currency.name)") {
+            Button {
                 clock.selectedCurrency = currency
+            } label: {
+                choiceLabel("\(currency.code) · \(currency.name)",
+                            isSelected: clock.selectedCurrency == currency)
             }
         }
         Divider()
         Menu("All currencies") {
             ForEach(Currency.selectable) { currency in
-                Button("\(currency.code) · \(currency.name)") {
+                Button {
                     clock.selectedCurrency = currency
+                } label: {
+                    choiceLabel("\(currency.code) · \(currency.name)",
+                                isSelected: clock.selectedCurrency == currency)
                 }
             }
         }
@@ -81,21 +103,24 @@ struct SettingsView: View {
         guard !clock.selectedCurrency.isBase else { return nil }
 
         let code = clock.selectedCurrency.code
-        if clock.isRefreshingRates { return "Updating rates…" }
         if let rates = clock.exchangeRates, let rate = rates.rate(for: code) {
             let one = CurrencyFormatter.string(1, currency: .usd)
             let converted = CurrencyFormatter.string(rate, currency: clock.selectedCurrency)
-            return "\(one) = \(converted) · \(relative(rate: rates, code: code))"
+            let age = relative(rate: rates)
+            if clock.isRefreshingRates { return "Using saved rate · updated \(age)" }
+            if clock.didFailRates { return "Update failed · using rate from \(age)" }
+            return "\(one) = \(converted) · updated \(age)"
         }
-        if clock.didFailRates { return "Rates unavailable — showing USD" }
-        if clock.exchangeRates != nil { return "No rate for \(code) — showing USD" }
-        return nil
+        if clock.isRefreshingRates { return "Loading exchange rates…" }
+        if clock.didFailRates { return "Rates unavailable - showing USD" }
+        if clock.exchangeRates != nil { return "No rate for \(code) - showing USD" }
+        return "Loading exchange rates…"
     }
 
-    private func relative(rate: ExchangeRates, code: String) -> String {
+    private func relative(rate: ExchangeRates) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return "updated \(formatter.localizedString(for: rate.updatedAt, relativeTo: Date()))"
+        return formatter.localizedString(for: rate.updatedAt, relativeTo: Date())
     }
 
     private func rateStatusRow(_ text: String) -> some View {
@@ -103,8 +128,8 @@ struct SettingsView: View {
             Text(text)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
             Button {
                 clock.refreshRates()
@@ -130,6 +155,17 @@ struct SettingsView: View {
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(.tint)
         .fixedSize()
+    }
+
+    private func choiceLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+            Spacer(minLength: 16)
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+        }
     }
 
     private func settingRow<Content: View>(title: String,

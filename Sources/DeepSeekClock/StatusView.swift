@@ -33,7 +33,7 @@ struct StatusView: View {
                         .font(.system(size: 9.5))
                         .italic()
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 3)
+                        .padding(.leading, 6)
                 }
             }
             Divider()

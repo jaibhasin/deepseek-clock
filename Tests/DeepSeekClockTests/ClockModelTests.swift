@@ -28,11 +28,18 @@ final class ClockModelTests: XCTestCase {
         XCTAssertEqual(ClockModel.format(-5), "0s")
     }
 
-    /// The absolute transition is rendered as a local wall-clock time (using the
-    /// Mac's current time zone), so the result is a non-empty, human-readable time.
-    func testTransitionFormattingProducesLocalTime() {
-        let text = ClockModel.formatTransition(TestSupport.utc(2026, 9, 21, 4, 0))
-        XCTAssertFalse(text.isEmpty)
+    /// The transition time is rendered in whichever zone is requested, so the same
+    /// instant reads differently for different display zones.
+    func testTransitionFormattingUsesRequestedTimeZone() {
+        let transition = TestSupport.utc(2026, 9, 21, 4, 0)
+        let kolkata = TimeZone(identifier: "Asia/Kolkata")!
+        let losAngeles = TimeZone(identifier: "America/Los_Angeles")!
+
+        let kolkataText = ClockModel.formatTransition(transition, in: kolkata)
+        let losAngelesText = ClockModel.formatTransition(transition, in: losAngeles)
+
+        XCTAssertFalse(kolkataText.isEmpty)
+        XCTAssertNotEqual(kolkataText, losAngelesText)
     }
 
     // MARK: - Off-peak notification
